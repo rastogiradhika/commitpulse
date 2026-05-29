@@ -62,7 +62,42 @@ export async function fetchWithRetry(
 
   if (!res) throw new Error('GitHub API request failed without a response');
 
-  const shouldRetry = res.status === 429 || res.status >= 500;
+  // Check for rate limit headers
+  const retryAfter = res.headers.get('retry-after');
+  const isRateLimited =
+    res.status === 429 || (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0');
+
+  if (isRateLimited) {
+    if (attempt >= MAX_RETRIES) return res;
+
+    let delay = BASE_DELAY_MS * Math.pow(2, attempt);
+    if (retryAfter) {
+      const parsed = parseInt(retryAfter, 10);
+      if (!Number.isNaN(parsed) && String(parsed) === retryAfter) {
+        delay = parsed * 1000;
+      } else {
+        const dateDelay = Date.parse(retryAfter) - Date.now();
+        if (!Number.isNaN(dateDelay) && dateDelay > 0) {
+          delay = dateDelay;
+        }
+      }
+    }
+
+    // Clamp between exponential default and maximum safe delay before we early exit anyway
+    delay = Math.max(BASE_DELAY_MS, delay);
+
+    // If the delay is too long (e.g., > 5 seconds), it's a hard limit.
+    // Return immediately to avoid serverless function timeouts.
+    if (delay > 5000) {
+      return res;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return fetchWithRetry(url, options, attempt + 1, timeoutMs);
+  }
+
+  // Only retry on 5xx — all other statuses are returned immediately
+  const shouldRetry = res.status >= 500;
   if (!shouldRetry || attempt >= MAX_RETRIES) return res;
 
   const delay = BASE_DELAY_MS * Math.pow(2, attempt);
@@ -255,12 +290,30 @@ export async function fetchGitHubContributions(
   if (!res.ok) {
     throwIfRateLimited(res);
     if (res.status === 401) throw new Error('GitHub PAT is invalid or missing');
-    throw new Error(`GitHub GraphQL API returned status ${res.status}`);
+    throw new Error(
+      `GitHub GraphQL API returned status ${res.status} after ${MAX_RETRIES} retries`
+    );
   }
 
   const data: GitHubContributionResponse = await res.json();
-  if (data.errors !== undefined) throw new Error(getGraphQLErrorMessage(data.errors));
-  if (!data.data?.user) throw new Error(`GitHub user "${username}" not found`);
+
+  if (data.errors !== undefined) {
+    if (Array.isArray(data.errors)) {
+      const isRateLimit = data.errors.some(
+        (e) =>
+          e?.message?.toLowerCase().includes('rate limit') ||
+          (e as { type?: string })?.type === 'RATE_LIMITED'
+      );
+      if (isRateLimit) {
+        throw new Error('API Rate Limit Exceeded');
+      }
+    }
+    throw new Error(getGraphQLErrorMessage(data.errors));
+  }
+
+  if (!data.data?.user) {
+    throw new Error(`GitHub user "${username}" not found`);
+  }
 
   const calendar = data.data.user.contributionsCollection.contributionCalendar;
 
@@ -319,6 +372,12 @@ export async function fetchUserProfile(
   if (!res.ok) {
     throwIfRateLimited(res);
     if (res.status === 404) throw new Error('User not found');
+    if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
+      throw new Error('API Rate Limit Exceeded');
+    }
+    if (res.status === 429) {
+      throw new Error('API Rate Limit Exceeded');
+    }
     throw new Error(`GitHub REST API error: ${res.status}`);
   }
 
