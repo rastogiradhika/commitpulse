@@ -76,6 +76,13 @@ export default function LandingPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const { searches, addSearch, clearSearches, removeSearch } = useRecentSearches();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
   const trimmedUsername = username.trim();
   const debouncedUsername = useDebounce(trimmedUsername, 500);
   const hasUsername = debouncedUsername.length > 0;
@@ -103,17 +110,17 @@ export default function LandingPage() {
     fetch(badgeUrl, { signal: controller.signal })
       .then(async (res) => {
         const text = await res.text();
-        if (res.ok === false && (res.status === 429 || res.status === 400)) {
+        if (!res.ok) {
           setSvgContent(null);
           setSvgState('error');
-          setErrorMessage('GitHub user not found');
+          if (res.status === 404 || res.status === 400 || res.status === 429) {
+            setErrorMessage('GitHub user not found');
+          } else {
+            setErrorMessage('Failed to load badge');
+          }
           return;
         }
-        if (!res.ok) {
-          setSvgState('error');
-          return;
-        }
-        return res.text();
+        return text;
       })
       .then((text) => {
         if (!text) return;
@@ -124,6 +131,7 @@ export default function LandingPage() {
       .catch((err) => {
         if (err.name === 'AbortError') return;
         setSvgState('error');
+        setErrorMessage('Failed to load badge');
       });
     return () => controller.abort();
   }, [badgeUrl, hasUsername]);
@@ -229,6 +237,7 @@ export default function LandingPage() {
                 <div className="relative flex-1 flex items-center w-full">
                   <input
                     type="text"
+                    suppressHydrationWarning
                     placeholder="Enter GitHub Username"
                     className="flex-1 rounded-2xl border border-black/10 bg-white px-5 py-4 text-sm text-black outline-none transition-all duration-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent dark:border-white/10 dark:bg-black/60 dark:text-white dark:placeholder:text-gray-500 shadow-inner"
                     value={username}
@@ -255,9 +264,10 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   type="submit"
-                  disabled={trimmedUsername.length === 0}
+                  suppressHydrationWarning
+                  disabled={!mounted || trimmedUsername.length === 0}
                   className={`relative flex min-w-[160px] items-center justify-center gap-2 overflow-hidden rounded-2xl px-6 py-4 text-sm font-semibold transition-all duration-300 transform cursor-pointer hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed ${
-                    trimmedUsername.length > 0
+                    mounted && trimmedUsername.length > 0
                       ? 'bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 shadow-md'
                       : 'bg-gray-100 text-gray-400 dark:bg-white/5 dark:text-white/20'
                   }`}
@@ -285,10 +295,13 @@ export default function LandingPage() {
                   </AnimatePresence>
                 </button>
                 <Link
-                  href={trimmedUsername.length > 0 ? `/dashboard/${trimmedUsername}` : '/'}
-                  aria-disabled={trimmedUsername.length === 0}
+                  href={
+                    mounted && trimmedUsername.length > 0 ? `/dashboard/${trimmedUsername}` : '/'
+                  }
+                  suppressHydrationWarning
+                  aria-disabled={!mounted || trimmedUsername.length === 0}
                   onClick={(e) => {
-                    if (trimmedUsername.length === 0) {
+                    if (!mounted || trimmedUsername.length === 0) {
                       e.preventDefault();
                     } else {
                       trackUser(trimmedUsername);
@@ -296,7 +309,7 @@ export default function LandingPage() {
                     }
                   }}
                   className={`relative flex min-w-[160px] items-center justify-center gap-2 overflow-hidden rounded-2xl border px-6 py-4 text-sm font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] ${
-                    trimmedUsername.length > 0
+                    mounted && trimmedUsername.length > 0
                       ? 'border-black/10 bg-white text-black hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 shadow-sm'
                       : 'border-black/5 bg-gray-50 text-gray-400 dark:border-white/5 dark:bg-transparent dark:text-white/20'
                   }`}
@@ -349,7 +362,7 @@ export default function LandingPage() {
                   {svgState === 'loading' && (
                     <div className="h-[240px] w-full max-w-[700px] rounded-2xl bg-black/5 dark:bg-white/5 animate-pulse" />
                   )}
-                  {svgState === 'error' && (
+                  {svgState === 'error' && errorMessage === 'GitHub user not found' && (
                     <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
                       <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-red-500/20 bg-red-500/10 shadow-inner">
                         <X size={32} className="text-red-500" />
@@ -364,7 +377,7 @@ export default function LandingPage() {
                       </div>
                     </div>
                   )}
-                  {svgState === 'error' && (
+                  {svgState === 'error' && errorMessage !== 'GitHub user not found' && (
                     <div className="flex flex-col items-center justify-center gap-2 text-center py-8">
                       <p className="text-sm font-semibold text-red-500 dark:text-red-400">
                         Failed to load badge
