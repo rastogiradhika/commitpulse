@@ -1106,6 +1106,18 @@ describe('cacheKey', () => {
   it('creates key with year', () => {
     expect(cacheKey('contributions', 'DeepSikha', '2025')).toBe('contributions:deepsikha:2025');
   });
+
+  it('creates key with from and to date range', () => {
+    expect(cacheKey('contributions', 'octocat', '2024-01-01', '2024-06-30')).toBe(
+      'contributions:octocat:2024-01-01:2024-06-30'
+    );
+  });
+
+  it('collision test: different to dates produce different keys', () => {
+    const keyA = cacheKey('contributions', 'octocat', '2024-01-01', '2024-06-30');
+    const keyB = cacheKey('contributions', 'octocat', '2024-01-01', '2024-12-31');
+    expect(keyA).not.toBe(keyB);
+  });
 });
 describe('buildInsights', () => {
   it('uses active streak message when current streak > 3', () => {

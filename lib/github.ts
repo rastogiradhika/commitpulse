@@ -212,8 +212,25 @@ export function cacheKey(
   kind: 'contributions' | 'profile' | 'repos',
   username: string,
   year?: string
+): string;
+export function cacheKey(
+  kind: 'contributions' | 'profile' | 'repos',
+  username: string,
+  from?: string,
+  to?: string
+): string;
+export function cacheKey(
+  kind: 'contributions' | 'profile' | 'repos',
+  username: string,
+  yearOrFrom?: string,
+  to?: string
 ): string {
-  return year ? `${kind}:${username.toLowerCase()}:${year}` : `${kind}:${username.toLowerCase()}`;
+  if (yearOrFrom && to) {
+    return `${kind}:${username.toLowerCase()}:${yearOrFrom.substring(0, 10)}:${to.substring(0, 10)}`;
+  }
+  return yearOrFrom
+    ? `${kind}:${username.toLowerCase()}:${yearOrFrom.substring(0, 4)}`
+    : `${kind}:${username.toLowerCase()}`;
 }
 
 export function clearGitHubApiCacheForTests(): void {
@@ -272,7 +289,7 @@ export async function fetchGitHubContributions(
   username: string,
   options: FetchOptions = {}
 ): Promise<ContributionCalendar> {
-  const key = cacheKey('contributions', username, options.from?.substring(0, 4));
+  const key = cacheKey('contributions', username, options.from, options.to);
   if (!options.bypassCache) {
     const cached = await contributionsCache.get(key);
     if (cached) return cached;
