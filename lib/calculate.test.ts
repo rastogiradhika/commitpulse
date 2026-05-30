@@ -488,6 +488,35 @@ describe('calculateStreak', () => {
     expect(resultTuesday.currentStreak).toBe(0);
     expect(resultTuesday.longestStreak).toBe(2);
   });
+
+  it('verify streak formulas for different starting days of the week timeline (Variation 2)', () => {
+    // Week 1: 0, 0, 1, 1, 1, 1, 1 (Starts on Wednesday, 5 days)
+    // Week 2: 1, 1, 1, 1, 1, 1, 1 (7 days)
+    // Week 3: 1, 1, 1              // Ends on Wednesday (3 days)
+    // Total continuous streak = 15 days, ending on the last day.
+    const calendar = buildCalendar([
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1, // Week 1 (Starts Wed)
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1, // Week 2
+      1,
+      1,
+      1, // Week 3 (Ends Wed)
+    ]);
+    const result = calculateStreak(calendar);
+    expect(result.currentStreak).toBe(15);
+    expect(result.longestStreak).toBe(15);
+  });
 });
 
 it('handles massive single-day commit spike timeline', () => {
