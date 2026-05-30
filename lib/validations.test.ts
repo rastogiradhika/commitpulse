@@ -252,6 +252,17 @@ describe('streakParamsSchema', () => {
     }
   });
 
+  it('should reject user values longer than 39 characters', () => {
+    const result = streakParamsSchema.safeParse({
+      user: 'a'.repeat(40),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain('cannot exceed 39 characters');
+    }
+  });
+
   it('should fail when user is whitespace-only input', () => {
     const result = streakParamsSchema.safeParse({
       user: '   ',
