@@ -12,6 +12,7 @@ import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Footer } from '@/app/components/Footer';
 import InteractiveViewer from '@/components/InteractiveViewer';
+import DOMPurify from 'dompurify';
 
 const Icons = {
   Github: () => (
@@ -393,7 +394,11 @@ export default function LandingPage() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.5, ease: 'easeOut' }}
                       className="cp-svg-container w-full max-w-[700px] drop-shadow-[0_30px_60px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_30px_60px_rgba(0,0,0,0.5)] [&>svg]:w-full [&>svg]:h-auto"
-                      dangerouslySetInnerHTML={{ __html: svgContent }}
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(svgContent, {
+                          USE_PROFILES: { svg: true, html: true },
+                        }),
+                      }}
                     />
                   )}
                   {svgState === 'loaded' && !svgContent && errorMessage && (
