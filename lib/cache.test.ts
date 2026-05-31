@@ -487,6 +487,20 @@ describe('TTLCache', () => {
 
       cache.destroy();
     });
+
+    it('handles oversized cache keys safely', () => {
+      const cache = new TTLCache<string>();
+
+      const oversizedKey = 'a'.repeat(20000);
+
+      expect(() => {
+        cache.set(oversizedKey, 'large-key-value', 60_000);
+      }).not.toThrow();
+
+      expect(cache.get(oversizedKey)).toBe('large-key-value');
+
+      cache.destroy();
+    });
   });
 });
 
