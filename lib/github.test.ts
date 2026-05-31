@@ -18,6 +18,7 @@ import {
   getOrgDashboardData,
   getWrappedData,
   computeDeveloperScore,
+  runCappedConcurrency,
 } from './github';
 import type { ContributionCalendar } from '../types';
 
@@ -1676,5 +1677,46 @@ describe('computeDeveloperScore', () => {
         longestStreak: 2,
       })
     ).toBe(2);
+  });
+});
+
+describe('runCappedConcurrency', () => {
+  it('should process all items and return their results in order', async () => {
+    const items = [1, 2, 3, 4, 5];
+    const results = await runCappedConcurrency(items, 2, async (x) => {
+      return x * 10;
+    });
+
+    expect(results).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it('should strictly limit the concurrency to the specified limit', async () => {
+    const items = [1, 2, 3, 4, 5];
+    let activePromises = 0;
+    let maxConcurrentPromises = 0;
+
+    await runCappedConcurrency(items, 2, async (x) => {
+      activePromises++;
+      maxConcurrentPromises = Math.max(maxConcurrentPromises, activePromises);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      activePromises--;
+      return x;
+    });
+
+    expect(maxConcurrentPromises).toBeLessThanOrEqual(2);
+  });
+
+  it('should handle errors inside tasks gracefully without aborting the entire sequence', async () => {
+    const items = [1, 2, 3, 4, 5];
+    const results = await runCappedConcurrency(items, 2, async (x) => {
+      if (x === 3) throw new Error('Task 3 failed');
+      return x * 10;
+    });
+
+    expect(results[0]).toBe(10);
+    expect(results[1]).toBe(20);
+    expect(results[2]).toBeNull();
+    expect(results[3]).toBe(40);
+    expect(results[4]).toBe(50);
   });
 });
