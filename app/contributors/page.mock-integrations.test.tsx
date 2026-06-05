@@ -19,9 +19,7 @@ vi.mock('./ContributorsClient', () => ({
 }));
 
 describe('ContributorsPage Mock Integrations', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => { vi.clearAllMocks(); vi.resetModules(); });
 
   it('renders successfully using mocked service data', async () => {
     const { default: ContributorsPage } = await import('./page');
@@ -42,8 +40,9 @@ describe('ContributorsPage Mock Integrations', () => {
 
     expect(mockContributorsClient).toHaveBeenCalled();
 
-    const props = mockContributorsClient.mock.calls[0][0] as ContributorsClientProps;
-
+    expect(mockContributorsClient).toHaveBeenCalledTimes(1); 
+    const props = mockContributorsClient.mock.calls[0][0] as ContributorsClientProps; 
+    expect(props.contributors).toBeDefined(); 
     expect(Array.isArray(props.contributors)).toBe(true);
   });
 
@@ -56,7 +55,7 @@ describe('ContributorsPage Mock Integrations', () => {
 
     const props = mockContributorsClient.mock.calls[0][0] as ContributorsClientProps;
 
-    expect(typeof props.totalContributions).toBe('number');
+    expect(props.totalContributions).toBeGreaterThanOrEqual(0);
   });
 
   it('passes top contributors collection to client component', async () => {
@@ -72,15 +71,10 @@ describe('ContributorsPage Mock Integrations', () => {
   });
 
   it('falls back to empty contributor data on failed endpoint responses', async () => {
-    const originalFetch = global.fetch;
-
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      headers: {
-        get: () => null,
-      },
-    } as unknown as Response);
+    vi.stubGlobal( 'fetch', vi.fn().mockResolvedValue({ 
+      ok: false, status: 500, headers: { 
+        get: () => null, },
+      } as unknown as Response) );
 
     const { default: ContributorsPage } = await import('./page');
 
@@ -89,7 +83,5 @@ describe('ContributorsPage Mock Integrations', () => {
     render(page);
 
     expect(screen.getByTestId('contributors-client')).toBeInTheDocument();
-
-    global.fetch = originalFetch;
   });
 });
