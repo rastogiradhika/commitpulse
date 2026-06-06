@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Notification } from '@/models/Notification';
 import { notifyPostSchema, notifyGetSchema } from '@/lib/validations';
@@ -166,6 +166,85 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     console.error('[/api/notify] Error saving notification preferences:', error);
+    return NextResponse.json(
+      { success: false, message: 'Internal server error.' },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── DELETE /api/notify ──────────────────────────────────────────────────────
+// Remove notification preferences for a user (unsubscribe / right to erasure)
+export async function DELETE(req: NextRequest) {
+  // Rate limiting
+  const ip = getClientIp(req);
+
+  const rateLimitKey =
+    ip && ip !== 'unknown' ? ip : `unknown:${req.headers.get('user-agent') ?? 'no-agent'}`;
+
+  if (!(await notifyRateLimiter.check(rateLimitKey))) {
+    return NextResponse.json(
+      { success: false, message: 'Too many requests, please try again later.' },
+      { status: 429 }
+    );
+  }
+
+  // Validate query params with Zod (reuse notifyGetSchema — expects ?user=)
+  const { searchParams } = new URL(req.url);
+  const parsed = notifyGetSchema.safeParse({
+    user: searchParams.get('user') ?? undefined,
+  });
+
+  if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten();
+    const firstError =
+      Object.values(fieldErrors.fieldErrors).flat()[0] ??
+      fieldErrors.formErrors[0] ??
+      'Invalid request parameters.';
+    return NextResponse.json({ success: false, message: firstError }, { status: 400 });
+  }
+
+  const { user: username } = parsed.data;
+
+  try {
+    // Graceful MONGODB_URI handling
+    if (!process.env.MONGODB_URI) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error(
+          'CRITICAL: MONGODB_URI is not set in production environment. Notification deletion is disabled.'
+        );
+        return NextResponse.json(
+          { success: false, message: 'Database configuration error.' },
+          { status: 500 }
+        );
+      }
+
+      console.warn(
+        'MONGODB_URI is not set. Bypassing notification deletion for local development.'
+      );
+      return NextResponse.json({
+        success: true,
+        message: 'Notification deletion bypassed (no database configured).',
+      });
+    }
+
+    await dbConnect();
+
+    const result = await Notification.deleteOne({ username: username.toLowerCase() });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { success: false, message: 'No notification preferences found for this user.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Notification preferences deleted successfully.' },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('[/api/notify] Error deleting notification preferences:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error.' },
       { status: 500 }
