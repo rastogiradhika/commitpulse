@@ -49,11 +49,9 @@ describe('GrowthTrendChart Edge Cases & Empty/Missing Inputs Verification', () =
       <GrowthTrendChart activityA={[]} activityB={[]} labelA="User A" labelB="User B" />
     );
 
-    const chartContainer = container.querySelector(
-      '.relative.w-full.h-\\[180px\\].overflow-hidden'
-    );
+    const chartContainer = screen.getByTestId('growth-trend-chart-container');
 
-    expect(chartContainer).not.toBeNull();
+    expect(chartContainer).toBeInTheDocument();
 
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('viewBox', '0 0 500 180');
