@@ -68,10 +68,11 @@ export function truncateUsername(username: string): string {
   return username.length > 12 ? `${username.slice(0, 12)}...` : username;
 }
 
-export function deterministicRandom(seed: string): number {
+export function deterministicRandom(seed?: string | null): number {
+  const safeSeed = seed || '';
   let hash = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i);
+  for (let i = 0; i < safeSeed.length; i++) {
+    hash ^= safeSeed.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0) / 4294967296;
