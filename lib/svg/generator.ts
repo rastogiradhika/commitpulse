@@ -2842,15 +2842,10 @@ export function generateLanguagesSVG(
     const scaledY = H / 2 + (50 + lang.coord.y) * sf;
     const h = Math.max(30, (lang.percentage / maxPercent) * 140) * sf;
 
-    // Scale up the tower base size
-    const tw = 16 * TOWER_SCALE * sf; // half-width
-    const th = 10 * TOWER_SCALE * sf; // half-height
-
-    const paths = {
-      left: `M0 ${-h} L0 ${th} L${-tw} 0 L${-tw} ${-h - th} Z`,
-      right: `M0 ${-h} L0 ${th} L${tw} 0 L${tw} ${-h - th} Z`,
-      top: `M0 ${-h - th} L${tw} ${-h} L0 ${-h + th} L${-tw} ${-h} Z`,
-    };
+    // Use the centralized tower path builder for consistent isometric geometry
+    const towerScale = TOWER_SCALE * sf;
+    const paths = buildTowerPaths(h, towerScale);
+    const th = 10 * towerScale; // half-height, used for text label positioning
 
     const hexColor = lang.color.startsWith('#') ? lang.color : `#${lang.color}`;
     const delay = (idx * 0.15).toFixed(3);
