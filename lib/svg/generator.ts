@@ -2143,75 +2143,26 @@ function generateAutoThemeVersusSVG(
     sf
   );
 
-  let towers1 = '';
-  for (const t of towerData1) {
-    const fillClass = t.isGhost ? 'cp-text-fill' : 'cp-accent-fill';
-    const strokeColor = t.isGhost ? 'var(--cp-text)' : 'var(--cp-accent)';
-    const delay = ((t.row + t.col) * 0.015).toFixed(3);
-
-    let leftStrokeAttr = `stroke="${strokeColor}" stroke-opacity="${t.strokeOpacity}" stroke-width="${t.strokeWidth}"`;
-    let rightStrokeAttr = leftStrokeAttr;
-    let topStrokeAttr = leftStrokeAttr;
-
-    if (t.isToday && t.contributionCount === 0) {
-      leftStrokeAttr = t.isGhost
-        ? `stroke="${strokeColor}" stroke-opacity="${t.strokeOpacity}" stroke-width="${t.strokeWidth}"`
-        : '';
-      rightStrokeAttr = leftStrokeAttr;
-      topStrokeAttr = `stroke="var(--cp-accent)" stroke-opacity="0.8" stroke-width="${1.2 * sf}"`;
-    }
-
-    const paths = buildTowerPaths(t.h, 1);
-
-    towers1 += `
-        <g transform="translate(${t.x}, ${t.y})">
-          <g class="cp-tower" style="animation-delay: ${delay}s;">
-            ${t.isToday ? '<animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite" />' : ''}
-            <title>${escapeXML(t.tooltip)}</title>
-            <path d="${paths.left}" class="${fillClass}" fill-opacity="${t.faceOpacity.left}" ${leftStrokeAttr} />
-            <path d="${paths.right}" class="${fillClass}" fill-opacity="${t.faceOpacity.right}" ${rightStrokeAttr} />
-            <path d="${paths.top}" class="${fillClass}" fill-opacity="${t.faceOpacity.top}" ${topStrokeAttr} />
-            ${t.contributionCount > 5 ? `<path d="${paths.top}" fill="white" fill-opacity="0.2" />` : ''}
-          </g>
-        </g>`;
-    if (t.contributionCount >= 10)
-      towers1 += generateParticles(t.x, t.y, t.h, t.contributionCount, sf, true);
-  }
-
-  let towers2 = '';
-  for (const t of towerData2) {
-    const fillClass = t.isGhost ? 'cp-text-fill' : 'cp-accent-fill';
-    const strokeColor = t.isGhost ? 'var(--cp-text)' : 'var(--cp-accent)';
-    const delay = ((t.row + t.col) * 0.015).toFixed(3);
-
-    let leftStrokeAttr = `stroke="${strokeColor}" stroke-opacity="${t.strokeOpacity}" stroke-width="${t.strokeWidth}"`;
-    let rightStrokeAttr = leftStrokeAttr;
-    let topStrokeAttr = leftStrokeAttr;
-
-    if (t.isToday && t.contributionCount === 0) {
-      leftStrokeAttr = t.isGhost
-        ? `stroke="${strokeColor}" stroke-opacity="${t.strokeOpacity}" stroke-width="${t.strokeWidth}"`
-        : '';
-      rightStrokeAttr = leftStrokeAttr;
-      topStrokeAttr = `stroke="var(--cp-accent)" stroke-opacity="0.8" stroke-width="${1.2 * sf}"`;
-    }
-
-    const paths = buildTowerPaths(t.h, 1);
-
-    towers2 += `
-        <g transform="translate(${t.x}, ${t.y})">
-          <g class="cp-tower" style="animation-delay: ${delay}s;">
-            ${t.isToday ? '<animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite" />' : ''}
-            <title>${escapeXML(t.tooltip)}</title>
-            <path d="${paths.left}" class="${fillClass}" fill-opacity="${t.faceOpacity.left}" ${leftStrokeAttr} />
-            <path d="${paths.right}" class="${fillClass}" fill-opacity="${t.faceOpacity.right}" ${rightStrokeAttr} />
-            <path d="${paths.top}" class="${fillClass}" fill-opacity="${t.faceOpacity.top}" ${topStrokeAttr} />
-            ${t.contributionCount > 5 ? `<path d="${paths.top}" fill="white" fill-opacity="0.2" />` : ''}
-          </g>
-        </g>`;
-    if (t.contributionCount >= 10)
-      towers2 += generateParticles(t.x, t.y, t.h, t.contributionCount, sf, true);
-  }
+  const towers1 = renderTowers(
+    towerData1,
+    params,
+    '',
+    '',
+    sf,
+    true,
+    params.opacity ?? 1.0,
+    params.animate ?? true
+  );
+  const towers2 = renderTowers(
+    towerData2,
+    params,
+    '',
+    '',
+    sf,
+    true,
+    params.opacity ?? 1.0,
+    params.animate ?? true
+  );
 
   const s = createScaler(sf);
   const fs = (n: number): number => Math.round(n * sf * 10) / 10;

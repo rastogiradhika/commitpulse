@@ -653,6 +653,34 @@ export const resumeConfirmDataSchema = z.object({
     ),
 });
 
+export const reviewPostSchema = z.object({
+  name: z
+    .string({ error: 'Name is required.' })
+    .trim()
+    .min(1, { message: 'Name is required.' })
+    .max(100, { message: 'Name must be at most 100 characters.' }),
+  handle: z
+    .string({ error: 'Handle is required.' })
+    .trim()
+    .min(1, { message: 'Handle is required.' })
+    .max(50, { message: 'Handle must be at most 50 characters.' })
+    .regex(/^@?[\w.-]+$/, { message: 'Handle must be a valid username.' }),
+  platform: z.enum(['twitter', 'github'], {
+    message: 'Platform must be twitter or github.',
+  }),
+  message: z
+    .string({ error: 'Message is required.' })
+    .trim()
+    .min(10, { message: 'Message must be at least 10 characters.' })
+    .max(1000, { message: 'Message must be at most 1000 characters.' }),
+  accentColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, { message: 'Accent color must be a valid hex color.' })
+    .default('#10b981'),
+});
+
+export type ReviewPostParams = z.infer<typeof reviewPostSchema>;
+
 export type StreakParams = z.infer<typeof streakParamsSchema>;
 export type GithubParams = z.infer<typeof githubParamsSchema>;
 export type CompareParams = z.infer<typeof compareParamsSchema>;
