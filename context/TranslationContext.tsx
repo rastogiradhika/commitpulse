@@ -111,7 +111,7 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
       value = getNestedValue(translations.en as Record<string, unknown>, path);
     }
 
-    if (typeof value !== 'string') {
+    if (typeof value !== 'string' || value === path) {
       if (params && 'defaultValue' in params) {
         return params.defaultValue;
       }
@@ -144,7 +144,7 @@ export function useTranslation() {
       changeLanguage: () => {},
       t: (path: string, params?: Record<string, string>): string => {
         const value = getNestedValue(en, path);
-        if (typeof value !== 'string') {
+        if (typeof value !== 'string' || value === path) {
           if (params && 'defaultValue' in params) {
             return params.defaultValue;
           }
