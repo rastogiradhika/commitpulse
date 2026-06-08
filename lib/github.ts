@@ -832,7 +832,7 @@ export async function fetchUserRepos(
   options: FetchOptions = {}
 ): Promise<GitHubRepo[]> {
   // 1. Lowercase and encode the username parameter right away to pass the case-insensitive test spec
-  const encodedUsername = encodeURIComponent(username.toLowerCase());
+  const encodedUsername = encodeURIComponent(username);
   const key = cacheKey('repos', encodedUsername);
 
   const load = async () => {
