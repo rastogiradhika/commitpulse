@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   fetchGitHubContributions,
   fetchWithRetry,
@@ -2234,6 +2234,128 @@ describe('getOrgDashboardData', () => {
     await expect(getOrgDashboardData('notanorg')).rejects.toThrow(
       'This endpoint is strictly for organizations.'
     );
+  });
+
+  it('correctly processes and aggregates 20 members without truncation', async () => {
+    const mockMembers = Array.from({ length: 20 }, (_, i) => ({ login: `member${i}` }));
+
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const urlStr = typeof url === 'string' ? url : (url?.toString() ?? '');
+      if (urlStr.includes('/orgs/org20/members')) return mockResponse(mockMembers);
+      if (urlStr.includes('/users/org20/repos')) return mockResponse([]);
+      if (urlStr.includes('/users/org20')) {
+        return mockResponse({
+          login: 'org20',
+          type: 'Organization',
+          public_repos: 5,
+          followers: 10,
+          created_at: '2020-01-01T00:00:00Z',
+        });
+      }
+      return mockResponse({
+        data: {
+          user: {
+            contributionsCollection: {
+              contributionCalendar: mockCalendar,
+              commitContributionsByRepository: [],
+            },
+          },
+        },
+      });
+    });
+
+    const result = await getOrgDashboardData('org20');
+    expect(result.profile.stats.following).toBe(20);
+    expect(result.isPartial).toBe(false);
+
+    const graphqlCalls = vi.mocked(fetch).mock.calls.filter((call) => {
+      const urlStr = call[0]?.toString() ?? '';
+      return urlStr.includes('graphql');
+    });
+    expect(graphqlCalls).toHaveLength(20);
+  });
+
+  it('correctly processes and aggregates 50 members without truncation', async () => {
+    const mockMembers = Array.from({ length: 50 }, (_, i) => ({ login: `member${i}` }));
+
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const urlStr = typeof url === 'string' ? url : (url?.toString() ?? '');
+      if (urlStr.includes('/orgs/org50/members')) return mockResponse(mockMembers);
+      if (urlStr.includes('/users/org50/repos')) return mockResponse([]);
+      if (urlStr.includes('/users/org50')) {
+        return mockResponse({
+          login: 'org50',
+          type: 'Organization',
+          public_repos: 5,
+          followers: 10,
+          created_at: '2020-01-01T00:00:00Z',
+        });
+      }
+      return mockResponse({
+        data: {
+          user: {
+            contributionsCollection: {
+              contributionCalendar: mockCalendar,
+              commitContributionsByRepository: [],
+            },
+          },
+        },
+      });
+    });
+
+    const result = await getOrgDashboardData('org50');
+    expect(result.profile.stats.following).toBe(50);
+    expect(result.isPartial).toBe(false);
+
+    const graphqlCalls = vi.mocked(fetch).mock.calls.filter((call) => {
+      const urlStr = call[0]?.toString() ?? '';
+      return urlStr.includes('graphql');
+    });
+    expect(graphqlCalls).toHaveLength(50);
+  });
+
+  it('correctly caps member processing at 100 for an organization with 120 members and flags isPartial as true', async () => {
+    const mockMembers = Array.from({ length: 120 }, (_, i) => ({ login: `member${i}` }));
+
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const urlStr = typeof url === 'string' ? url : (url?.toString() ?? '');
+      if (urlStr.includes('/orgs/org120/members')) {
+        if (urlStr.includes('page=2')) {
+          return mockResponse(mockMembers.slice(100));
+        }
+        return mockResponse(mockMembers.slice(0, 100));
+      }
+      if (urlStr.includes('/users/org120/repos')) return mockResponse([]);
+      if (urlStr.includes('/users/org120')) {
+        return mockResponse({
+          login: 'org120',
+          type: 'Organization',
+          public_repos: 5,
+          followers: 10,
+          created_at: '2020-01-01T00:00:00Z',
+        });
+      }
+      return mockResponse({
+        data: {
+          user: {
+            contributionsCollection: {
+              contributionCalendar: mockCalendar,
+              commitContributionsByRepository: [],
+            },
+          },
+        },
+      });
+    });
+
+    const result = await getOrgDashboardData('org120');
+    expect(result.profile.stats.following).toBe(120);
+    expect(result.isPartial).toBe(true);
+
+    const graphqlCalls = vi.mocked(fetch).mock.calls.filter((call) => {
+      const urlStr = call[0]?.toString() ?? '';
+      return urlStr.includes('graphql');
+    });
+    expect(graphqlCalls).toHaveLength(100);
   });
 });
 

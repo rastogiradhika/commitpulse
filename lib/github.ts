@@ -945,8 +945,9 @@ export async function getOrgDashboardData(
 
   const members = membersOrError;
 
-  // Limit active members to first 30 to protect shared token rate limit and improve response times
-  const activeMembers = members.slice(0, 30);
+  // Limit active members to protect shared token rate limit and improve response times (capped to 100)
+  const ORG_MEMBER_LIMIT = 100;
+  const activeMembers = members.slice(0, ORG_MEMBER_LIMIT);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 7000);
@@ -974,7 +975,8 @@ export async function getOrgDashboardData(
     clearTimeout(timeoutId);
   }
 
-  const isPartial = calendars.length < activeMembers.length;
+  const isPartial =
+    members.length > activeMembers.length || calendars.length < activeMembers.length;
 
   // Create the Mega-City
   const aggregatedCalendar = aggregateCalendars(calendars);
