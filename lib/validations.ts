@@ -1,6 +1,7 @@
 // lib/validations.ts
 import { supportedLanguages } from './i18n/badgeLabels';
 import { z } from 'zod';
+import type { HexColor } from '../types/index';
 import {
   isValidHex,
   sanitizeHexColor,
@@ -38,7 +39,7 @@ export function toValidTheme(val?: string): string | undefined {
 }
 
 export function toValidHexColor(defaultColor: string) {
-  return (val?: string): string | undefined =>
+  return (val?: string): HexColor | undefined =>
     val && isValidHex(val) ? sanitizeHexColor(val, defaultColor) : undefined;
 }
 
