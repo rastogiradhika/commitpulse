@@ -1,53 +1,91 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { POST } from './route';
 
-describe('ApiStudentResumeUploadRoute Theme Contrast and Visual Cohesion', () => {
-  it('emulates dual theme configuration presets correctly for upload route states', () => {
-    const themes = {
-      dark: { bg: '#0f172a', text: '#f8fafc' },
-      light: { bg: '#ffffff', text: '#0f172a' },
-    };
+vi.mock('@/lib/rate-limit', () => {
+  class MockRateLimiter {
+    check = vi.fn().mockResolvedValue(true);
+  }
+  return { RateLimiter: MockRateLimiter };
+});
 
-    expect(themes.dark.bg).toBe('#0f172a');
-    expect(themes.light.bg).toBe('#ffffff');
+vi.mock('@/lib/resume-parser', () => ({
+  parseResume: vi.fn().mockResolvedValue({
+    text: 'Mock parsed content',
+    skills: ['JavaScript', 'TypeScript'],
+    experience: [],
+  }),
+  ALLOWED_MIME_TYPES: ['application/pdf'],
+  MAX_FILE_SIZE: 5 * 1024 * 1024,
+  hasValidFileSignature: vi.fn().mockReturnValue(true),
+}));
+
+function makeUploadRequest(content: string | number[], type: string, name = 'resume.pdf'): Request {
+  const data = typeof content === 'string' ? content : new Uint8Array(content);
+  const file = new File([data], name, { type });
+  const form = new FormData();
+  form.append('resume', file);
+  return {
+    headers: new Headers(),
+    formData: async () => form,
+  } as unknown as Request;
+}
+
+describe('POST /api/student/resume/upload - Real Route Behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('asserts styling adapts properly according to current theme preset', () => {
-    const routeStyles = (theme: 'dark' | 'light') => ({
-      container: theme === 'dark' ? 'bg-slate-900' : 'bg-white',
-      text: theme === 'dark' ? 'text-slate-100' : 'text-slate-900',
-    });
+  it('returns 400 when no file is uploaded', async () => {
+    const emptyForm = new FormData();
+    const request = {
+      headers: new Headers(),
+      formData: async () => emptyForm,
+    } as unknown as Request;
 
-    expect(routeStyles('dark').container).toBe('bg-slate-900');
-    expect(routeStyles('light').container).toBe('bg-white');
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('No file uploaded');
   });
 
-  it('verifies contrast ratio compliance thresholds are met for textual feedback', () => {
-    const contrastRatio = 7.1;
+  it('returns 400 for disallowed MIME types', async () => {
+    const response = await POST(makeUploadRequest('fake content', 'text/html', 'malicious.html'));
+    const body = await response.json();
 
-    expect(contrastRatio).toBeGreaterThanOrEqual(4.5);
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('Invalid file type');
   });
 
-  it('checks active visual configuration classes across theme modes', () => {
-    const classes = [
-      'bg-white',
-      'bg-slate-900',
-      'text-slate-900',
-      'text-slate-100',
-      'border-slate-200',
-      'border-slate-800',
-    ];
+  it('returns 400 when PDF content does not match declared MIME type', async () => {
+    const response = await POST(
+      makeUploadRequest('<!DOCTYPE html><html></html>', 'application/pdf', 'fake.pdf')
+    );
+    const body = await response.json();
 
-    expect(classes).toContain('bg-white');
-    expect(classes).toContain('bg-slate-900');
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('does not match');
   });
 
-  it('ensures background overlays do not obscure upload status visibility', () => {
-    const overlay = {
-      opacity: 0.9,
-      contentVisible: true,
-    };
+  it('successfully uploads and parses a valid PDF file', async () => {
+    const response = await POST(
+      makeUploadRequest('%PDF-1.4\nTest resume content', 'application/pdf')
+    );
+    const body = await response.json();
 
-    expect(overlay.opacity).toBeLessThan(1);
-    expect(overlay.contentVisible).toBe(true);
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  it('returns 429 when rate limit is exceeded', async () => {
+    const { RateLimiter } = await import('@/lib/rate-limit');
+    vi.mocked(RateLimiter.prototype.check).mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+    const response = await POST(makeUploadRequest('%PDF-1.4 test', 'application/pdf'));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body.error).toContain('Too many requests');
   });
 });
