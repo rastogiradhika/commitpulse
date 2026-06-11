@@ -1544,6 +1544,16 @@ describe('GET /api/streak', () => {
       const response = await GET(makeRequest({ user: 'a, b' }));
       expect(response.status).toBe(404);
     });
+
+    it('rejects requests with more than 2 users with a 400 Bad Request', async () => {
+      const response = await GET(makeRequest({ user: 'a, b, c, d' }));
+      expect(response.status).toBe(400);
+
+      expect(fetchGitHubContributions).not.toHaveBeenCalled();
+
+      const body = await response.text();
+      expect(body).toContain('strictly accepts a maximum of 2 usernames');
+    });
   });
 
   describe('grace parameter boundary validation', () => {

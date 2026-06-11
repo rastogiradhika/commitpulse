@@ -305,7 +305,6 @@ export async function GET(request: Request) {
           'ValidationError: The streak comparison generator strictly accepts a maximum of 2 usernames.'
         );
       }
-
       let lastError: unknown = null;
       let hasOfflineFallback = false;
       const fetchedCalendars = await Promise.all(
