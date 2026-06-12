@@ -40,7 +40,7 @@ export function convertLocalToUtc(
     const offsetMs = tzUtcTime - utcDate.getTime();
     const targetUtcTime = Date.UTC(year, month - 1, day, hour, minute, second) - offsetMs;
     return new Date(targetUtcTime).toISOString().replace('.000Z', 'Z');
-  } catch (error) {
+  } catch {
     // Fallback to UTC if timezone is invalid or Intl throws
     return new Date(Date.UTC(year, month - 1, day, hour, minute, second))
       .toISOString()

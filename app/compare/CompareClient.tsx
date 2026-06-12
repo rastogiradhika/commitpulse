@@ -1067,9 +1067,6 @@ export default function CompareClient() {
     }
   };
 
-  const BASE_URL =
-    typeof window !== 'undefined' ? window.location.origin : 'https://commitpulse.vercel.app';
-
   const handleCompare = useCallback(
     async (u1: string, u2: string) => {
       const trimmedUser1 = u1.trim();
@@ -1489,13 +1486,15 @@ export default function CompareClient() {
                               @{user.profile.username}
                             </span>
                           </div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <Image
                             data-monolith-img="true"
                             key={`${user.profile.username}-${monolithKey}`}
-                            src={`${BASE_URL}/api/streak?user=${encodeURIComponent(user.profile.username)}&theme=neon&entrance=none&_k=${monolithKey}`}
+                            src={`/api/streak?user=${encodeURIComponent(user.profile.username)}&theme=neon&entrance=none&_k=${monolithKey}`}
                             alt={`${user.profile.username}'s CommitPulse monolith`}
-                            className="w-full"
+                            width={300}
+                            height={400}
+                            className="w-full h-auto"
+                            unoptimized
                           />
                         </motion.div>
                       ))}
