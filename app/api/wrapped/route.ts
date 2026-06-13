@@ -6,6 +6,10 @@ import { generateWrappedSVG, generateNotFoundSVG, generateRateLimitSVG } from '@
 import { wrappedParamsSchema } from '@/lib/validations';
 import type { BadgeParams } from '@/types';
 import { themes } from '@/lib/svg/themes';
+import { getClientIp } from '@/utils/getClientIp';
+import { quotaMonitor } from '@/services/github/quota-monitor';
+import { refreshPolicy } from '@/services/github/refresh-policy';
+import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
 
 const SVG_CSP_HEADER =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://fonts.gstatic.com;";
@@ -92,13 +96,35 @@ export async function GET(request: Request) {
       scale: 'linear',
     };
 
+    const ip = getClientIp(request);
+
     // Treat either ?refresh=true or ?bypassCache=true as a cache-bypass request
     const isRefreshRequested = refresh || bypassCacheParam;
 
+    if (isRefreshRequested && quotaMonitor.isQuotaLow()) {
+      throw new Error('Rate Limit: GitHub API quota is low. Cache refresh temporarily disabled.');
+    }
+
+    if (isRefreshRequested) {
+      const rateLimitCheck = refreshRateLimiter.checkLimit(ip);
+      if (!rateLimitCheck.success) {
+        throw new Error('Rate Limit: Refresh rate limit exceeded. Please try again later.');
+      }
+    }
+
+    let shouldBypassCache = isRefreshRequested;
+    if (isRefreshRequested) {
+      if (!refreshPolicy.isRefreshAllowed(user)) {
+        shouldBypassCache = false;
+      } else {
+        refreshPolicy.recordRefresh(user);
+      }
+    }
+
     // Fetch the wrapped stats for the year (calendar is included to avoid a duplicate API call)
     const wrappedStats = tz
-      ? await getWrappedData(user, year, { bypassCache: isRefreshRequested }, tz)
-      : await getWrappedData(user, year, { bypassCache: isRefreshRequested });
+      ? await getWrappedData(user, year, { bypassCache: shouldBypassCache }, tz)
+      : await getWrappedData(user, year, { bypassCache: shouldBypassCache });
 
     const svg = generateWrappedSVG(wrappedStats, params, year, wrappedStats.calendar);
 
@@ -113,9 +139,7 @@ export async function GET(request: Request) {
         'Content-Type': 'image/svg+xml',
         'Cache-Control': cacheControl,
         'Content-Security-Policy': SVG_CSP_HEADER,
-        'X-Cache-Status': isRefreshRequested
-          ? `BYPASS, fetched=${new Date().toISOString()}`
-          : 'HIT',
+        'X-Cache-Status': shouldBypassCache ? `BYPASS, fetched=${new Date().toISOString()}` : 'HIT',
       },
     });
   } catch (error: unknown) {

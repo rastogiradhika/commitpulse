@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { fetchBurnoutAnalysis } from '@/services/github/burnout-analyzer';
 import { quotaMonitor } from '@/services/github/quota-monitor';
 import { getClientIp } from '@/utils/getClientIp';
+import { refreshPolicy } from '@/services/github/refresh-policy';
+import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
 
 const repoBurnoutParamsSchema = z.object({
   owner: z
@@ -51,10 +53,40 @@ export async function GET(request: Request) {
     );
   }
 
-  try {
-    const data = await fetchBurnoutAnalysis(owner, repo, { bypassCache: refresh });
+  if (refresh) {
+    const rateLimitCheck = refreshRateLimiter.checkLimit(ip);
+    if (!rateLimitCheck.success) {
+      console.warn(
+        `[Rate Limit Exceeded] Blocked manual refresh from IP ${ip} for ${owner}/${repo}`
+      );
+      return NextResponse.json(
+        { error: 'Refresh rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitCheck.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitCheck.remaining.toString(),
+            'X-RateLimit-Reset': rateLimitCheck.reset.toString(),
+          },
+        }
+      );
+    }
+  }
 
-    const cacheControl = refresh
+  let shouldBypassCache = refresh;
+  if (refresh) {
+    const resourceKey = `${owner}/${repo}`;
+    if (!refreshPolicy.isRefreshAllowed(resourceKey)) {
+      shouldBypassCache = false;
+    } else {
+      refreshPolicy.recordRefresh(resourceKey);
+    }
+  }
+
+  try {
+    const data = await fetchBurnoutAnalysis(owner, repo, { bypassCache: shouldBypassCache });
+
+    const cacheControl = shouldBypassCache
       ? 'no-cache, no-store, must-revalidate'
       : 's-maxage=3600, stale-while-revalidate=86400';
 
@@ -62,7 +94,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Cache-Control': cacheControl,
-        'X-Cache-Status': refresh ? 'MISS' : 'HIT',
+        'X-Cache-Status': shouldBypassCache ? 'MISS' : 'HIT',
       },
     });
   } catch (error: unknown) {

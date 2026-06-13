@@ -26,6 +26,10 @@ import type { BadgeParams, RepoContribution, ExtendedContributionData } from '@/
 import { themes } from '@/lib/svg/themes';
 import { streakParamsSchema } from '@/lib/validations';
 import { sanitizeHexColor, sanitizeRadius } from '@/lib/svg/sanitizer';
+import { getClientIp } from '@/utils/getClientIp';
+import { quotaMonitor } from '@/services/github/quota-monitor';
+import { refreshPolicy } from '@/services/github/refresh-policy';
+import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
 
 const SVG_CSP_HEADER =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://fonts.gstatic.com;";
@@ -127,9 +131,50 @@ export async function GET(request: Request) {
       | 'constellation';
     const themeName = theme || 'dark';
 
+    const ip = getClientIp(request);
+
     // Treat either ?refresh=true or ?bypassCache=true as a cache-bypass request
     const isRefreshRequested = refresh || bypassCacheParam;
-    const shouldBypassCache = isRefreshRequested;
+
+    if (isRefreshRequested && quotaMonitor.isQuotaLow()) {
+      throw new Error('Rate Limit: GitHub API quota is low. Cache refresh temporarily disabled.');
+    }
+
+    if (isRefreshRequested) {
+      const rateLimitCheck = refreshRateLimiter.checkLimit(ip);
+      if (!rateLimitCheck.success) {
+        throw new Error('Rate Limit: Refresh rate limit exceeded. Please try again later.');
+      }
+    }
+
+    let shouldBypassCache = isRefreshRequested;
+    if (isRefreshRequested) {
+      let cooldownViolated = false;
+      const usernamesToCheck = org
+        ? [org]
+        : user
+            .split(',')
+            .map((u) => u.trim())
+            .filter(Boolean);
+      if (versus) {
+        usernamesToCheck.push(versus);
+      }
+
+      for (const u of usernamesToCheck) {
+        if (!refreshPolicy.isRefreshAllowed(u)) {
+          cooldownViolated = true;
+          break;
+        }
+      }
+
+      if (cooldownViolated) {
+        shouldBypassCache = false;
+      } else {
+        for (const u of usernamesToCheck) {
+          refreshPolicy.recordRefresh(u);
+        }
+      }
+    }
 
     let timezone = 'UTC';
     if (tzParam) {
@@ -514,6 +559,30 @@ type ParseResult = ReturnType<typeof streakParamsSchema.safeParse>;
 
 function buildErrorResponse(error: unknown, parseResult: ParseResult): NextResponse {
   const message = error instanceof Error ? error.message : String(error);
+
+  if (parseResult.success && parseResult.data.format === 'json') {
+    const isNotFound =
+      message.toLowerCase().includes('not found') ||
+      message.toLowerCase().includes('could not resolve');
+    const isRateLimit = message.toLowerCase().includes('rate limit');
+    const isValidationError =
+      (error instanceof Error && error.name === 'ValidationError') ||
+      message.toLowerCase().includes('invalid') ||
+      message.toLowerCase().includes('validation') ||
+      message.toLowerCase().includes('strictly for organizations');
+
+    const status = isRateLimit ? 429 : isNotFound ? 404 : isValidationError ? 400 : 500;
+    return NextResponse.json(
+      { error: message },
+      {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      }
+    );
+  }
   function buildInlineErrorSVG(text: string): string {
     const MAX_LINE = 48;
     const truncated = text.length > MAX_LINE * 2 ? text.slice(0, MAX_LINE * 2 - 1) + '…' : text;
