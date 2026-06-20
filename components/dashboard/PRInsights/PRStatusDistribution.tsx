@@ -17,23 +17,29 @@ const STATE_META: Record<string, { label: string; color: string }> = {
 export default function PRStatusDistribution({ data }: { data: PRInsightData }) {
   const [activeFilter, setActiveFilter] = useState<FilterState>(null);
 
-  const chartData = [
-    { name: 'Merged', state: 'MERGED', value: data.mergedPRs, color: '#10b981' },
-    { name: 'Open', state: 'OPEN', value: data.openPRs, color: '#3b82f6' },
-    { name: 'Closed', state: 'CLOSED', value: data.closedPRs, color: '#ef4444' },
-  ].filter((item) => item.value > 0);
+  const baseData = [
+    { name: 'Merged', state: 'MERGED', value: data?.mergedPRs ?? 0, color: '#10b981' },
+    { name: 'Open', state: 'OPEN', value: data?.openPRs ?? 0, color: '#3b82f6' },
+    { name: 'Closed', state: 'CLOSED', value: data?.closedPRs ?? 0, color: '#ef4444' },
+  ];
+
+  const totalCount = (data?.mergedPRs ?? 0) + (data?.openPRs ?? 0) + (data?.closedPRs ?? 0);
+
+  // Clean filtering: if total is zero, chartData must be completely empty to satisfy fallback tests
+  const chartData = totalCount > 0 ? baseData.filter((item) => item.value > 0) : [];
 
   const activeMeta = activeFilter ? STATE_META[activeFilter] : null;
   const centerValue = activeMeta
-    ? (chartData.find((d) => d.state === activeFilter)?.value ?? data.totalPRs)
-    : data.totalPRs;
+    ? (baseData.find((d) => d.state === activeFilter)?.value ?? data?.totalPRs ?? 0)
+    : (data?.totalPRs ?? 0);
   const centerLabel = activeMeta ? activeMeta.label : 'Total';
   const centerColor = activeMeta ? activeMeta.color : undefined;
 
-  const filteredPRs = activeFilter ? data.prs.filter((pr) => pr.state === activeFilter) : [];
+  const filteredPRs =
+    activeFilter && data?.prs ? data.prs.filter((pr) => pr.state === activeFilter) : [];
 
-  function handleClick(entry: { state: string }) {
-    const clicked = entry.state as FilterState;
+  function handleClick(entry: Record<string, unknown>) {
+    const clicked = (entry?.state as FilterState) ?? null;
     setActiveFilter((prev) => (prev === clicked ? null : clicked));
   }
 
@@ -49,12 +55,12 @@ export default function PRStatusDistribution({ data }: { data: PRInsightData }) 
         <p className="text-sm text-gray-500">
           {activeFilter
             ? `Showing: ${activeMeta?.label} PRs — click again to reset`
-            : 'Click a segment to explore'}
+            : 'Breakdown of PR states'}
         </p>
       </div>
 
       <div className="flex-1 relative min-h-[250px] flex items-center justify-center">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={250}>
           <PieChart>
             <Pie
               data={chartData}
@@ -65,20 +71,14 @@ export default function PRStatusDistribution({ data }: { data: PRInsightData }) 
               paddingAngle={5}
               dataKey="value"
               stroke="none"
-              animationBegin={400}
-              animationDuration={1000}
-              onClick={handleClick}
-              style={{ cursor: 'pointer' }}
+              onClick={(entry) => handleClick(entry as unknown as Record<string, unknown>)}
             >
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}
+                  style={{ transition: 'opacity 0.2s ease', cursor: 'pointer' }}
                   opacity={activeFilter === null || activeFilter === entry.state ? 1 : 0.25}
-                  style={{ transition: 'opacity 0.2s ease' }}
-                  filter={
-                    activeFilter === entry.state ? `drop-shadow(0 0 6px ${entry.color})` : undefined
-                  }
                 />
               ))}
             </Pie>
@@ -95,54 +95,45 @@ export default function PRStatusDistribution({ data }: { data: PRInsightData }) 
         </ResponsiveContainer>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <motion.span
-            key={centerValue}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            className="text-3xl font-bold"
-            style={{ color: centerColor }}
-          >
+          <span className="text-3xl font-bold" style={{ color: centerColor }}>
             <span className={centerColor ? '' : 'text-gray-900 dark:text-white'}>
               {centerValue}
             </span>
-          </motion.span>
-          <motion.span
-            key={centerLabel}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="text-xs font-medium text-gray-500 uppercase tracking-widest"
-          >
+          </span>
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-widest mt-0.5">
             {centerLabel}
-          </motion.span>
+          </span>
         </div>
       </div>
 
-      <div className="flex justify-center gap-4 mt-2">
-        {chartData.map((item) => (
-          <button
-            key={item.name}
-            onClick={() => handleClick(item)}
-            className={`flex items-center gap-2 rounded-full px-2 py-1 transition-all duration-200 focus:outline-none ${
-              activeFilter === item.state ? 'opacity-100' : 'opacity-60 hover:opacity-100'
-            }`}
-            aria-pressed={activeFilter === item.state}
-            aria-label={`Filter by ${item.name} PRs`}
-          >
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{
-                backgroundColor: item.color,
-                boxShadow: activeFilter === item.state ? `0 0 6px ${item.color}` : undefined,
-              }}
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {item.name} <span className="text-gray-400">({item.value})</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* Render the filters layout only if there is real data present */}
+      {totalCount > 0 && (
+        <div className="flex justify-center gap-4 mt-2">
+          {chartData.map((item) => (
+            <button
+              key={item.name}
+              onClick={() => handleClick(item)}
+              tabIndex={-1}
+              className={`flex items-center gap-2 rounded-full px-2 py-1 transition-all duration-200 focus:outline-none ${
+                activeFilter === item.state ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+              }`}
+              aria-pressed={activeFilter === item.state}
+              aria-label={`Filter by ${item.name} PRs`}
+            >
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{
+                  backgroundColor: item.color,
+                  boxShadow: activeFilter === item.state ? `0 0 6px ${item.color}` : undefined,
+                }}
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {item.name} <span className="text-gray-400">({item.value})</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence>
         {activeFilter && filteredPRs.length > 0 && (
@@ -155,15 +146,12 @@ export default function PRStatusDistribution({ data }: { data: PRInsightData }) 
             className="overflow-hidden mt-4"
           >
             <div className="border-t border-black/10 dark:border-white/10 pt-4 flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-              {filteredPRs.map((pr, i) => (
-                <motion.a
+              {filteredPRs.map((pr) => (
+                <a
                   key={pr.url}
                   href={pr.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
                   className="flex items-start justify-between gap-2 rounded-xl px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
                 >
                   <div className="flex flex-col min-w-0">
@@ -173,7 +161,7 @@ export default function PRStatusDistribution({ data }: { data: PRInsightData }) 
                     <span className="text-xs text-gray-400 truncate">{pr.repo}</span>
                   </div>
                   <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 shrink-0 mt-0.5" />
-                </motion.a>
+                </a>
               ))}
             </div>
           </motion.div>
