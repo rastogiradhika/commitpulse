@@ -805,7 +805,7 @@ export async function fetchGitHubContributions(
               isOfflineFallback: true,
             };
           }
-          return getMockContributions(username);
+          return getMockContributions();
         }
         throw err;
       }
@@ -830,7 +830,7 @@ export async function fetchGitHubContributions(
             isOfflineFallback: true,
           };
         }
-        return getMockContributions(username);
+        return getMockContributions();
       }
       throw err;
     }
@@ -856,7 +856,7 @@ export async function fetchGitHubContributions(
             isOfflineFallback: true,
           };
         }
-        return getMockContributions(username);
+        return getMockContributions();
       }
       throw err;
     }
@@ -878,7 +878,7 @@ export async function fetchGitHubContributions(
           isOfflineFallback: true,
         };
       }
-      return getMockContributions(username);
+      return getMockContributions();
     }
     throw err;
   }
