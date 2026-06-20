@@ -1,6 +1,27 @@
-// lib/svg/themes.ts
+import { z } from 'zod';
 import { BadgeTheme } from '../../types';
 import { hexColor } from './sanitizer';
+
+const HEX_COLOR_REGEX = /^[0-9a-fA-F]{3,4}$|^[0-9a-fA-F]{6,8}$/;
+
+export const badgeThemeSchema = z.object({
+  bg: z.string().regex(HEX_COLOR_REGEX, { message: 'Invalid bg color format' }),
+  text: z.string().regex(HEX_COLOR_REGEX, { message: 'Invalid text color format' }),
+  accent: z.string().regex(HEX_COLOR_REGEX, { message: 'Invalid accent color format' }),
+  negative: z
+    .string()
+    .regex(HEX_COLOR_REGEX, { message: 'Invalid negative color format' })
+    .optional(),
+});
+
+export function validateThemes(themesMap: Record<string, unknown>): void {
+  for (const [name, theme] of Object.entries(themesMap)) {
+    const result = badgeThemeSchema.safeParse(theme);
+    if (!result.success) {
+      throw new Error(`Theme validation failed for "${name}": ${result.error.message}`);
+    }
+  }
+}
 
 function makeTheme(bg: string, text: string, accent: string, negative?: string): BadgeTheme {
   return {
@@ -61,3 +82,5 @@ export function getNormalizedThemeKey(themeInput: string | undefined | null): st
 
   return matchedKey || 'default';
 }
+
+validateThemes(themes);
