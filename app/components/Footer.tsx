@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { useTranslation } from '@/context/TranslationContext';
 import {
@@ -85,6 +84,7 @@ const NAV_ICON_MAP: Record<string, React.ReactNode> = {
   '/compare': <GitCompare size={15} className="shrink-0" />,
   '/customize': <Sliders size={15} className="shrink-0" />,
   '/contributors': <Users size={15} className="shrink-0" />,
+  '/support': <MessageCircle size={15} className="shrink-0" />, // Added
 };
 
 const RESOURCE_ICON_MAP: Record<string, React.ReactNode> = {
@@ -102,6 +102,7 @@ export function Footer() {
     { label: t('footer.compare'), href: '/compare', isExternal: false },
     { label: t('footer.customization'), href: '/customize', isExternal: false },
     { label: t('footer.contributors'), href: '/contributors', isExternal: false },
+    { label: t('footer.support'), href: '/support', isExternal: false }, // Added
   ];
 
   const resourceLinks: FooterLink[] = [
@@ -162,7 +163,6 @@ export function Footer() {
           </div>
 
           {/* Navigation Section */}
-
           <div className="flex flex-col items-center sm:items-start">
             <h3 className="font-semibold text-sm text-black dark:text-white mb-3">
               {t('footer.navigation')}
@@ -185,7 +185,6 @@ export function Footer() {
           </div>
 
           {/* Resources Section */}
-
           <div className="flex flex-col items-center sm:items-start">
             <h3 className="font-semibold text-sm text-black dark:text-white mb-3">
               {t('footer.resources')}
@@ -212,7 +211,6 @@ export function Footer() {
           </div>
 
           {/* Connect Section */}
-
           <div className="flex flex-col items-center sm:items-start">
             <h3 className="font-semibold text-sm text-black dark:text-white mb-3">
               {t('footer.connect')}
