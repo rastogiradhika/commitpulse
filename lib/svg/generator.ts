@@ -812,7 +812,9 @@ export function generateSVG(
 
   const text = `#${sanitizeHexColor(params.text, 'ffffff')}`;
 
-  const borderAttr = params.border ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"` : '';
+  const borderAttr = params.border
+    ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"`
+    : '';
 
   const sanitizedFont = sanitizeFont(params.font);
   const selectedFont = resolveFont(sanitizedFont);
@@ -1609,7 +1611,9 @@ export function generateHeatmapSVG(
   const accent = `#${sanitizeHexColor(rawAccent, '00ffaa')}`;
   const text = `#${sanitizeHexColor(params.text, 'ffffff')}`;
 
-  const borderAttr = params.border ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"` : '';
+  const borderAttr = params.border
+    ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"`
+    : '';
 
   const sanitizedFont = sanitizeFont(params.font);
   const selectedFont = resolveFont(sanitizedFont);
@@ -3131,7 +3135,9 @@ export function generateLanguagesSVG(
   const accent = `#${sanitizeHexColor(accentStr, '00ffaa')}`;
 
   const text = `#${sanitizeHexColor(params.text, 'ffffff')}`;
-  const borderAttr = params.border ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"` : '';
+  const borderAttr = params.border
+    ? `stroke="#${sanitizeHexColor(params.border, '000000')}" stroke-width="2"`
+    : '';
 
   const sanitizedFont = sanitizeFont(params.font);
   const selectedFont = resolveFont(sanitizedFont);
