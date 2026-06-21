@@ -28,7 +28,7 @@ describe('sanitizer Accessibility Standards & Screen Reader Aria Compliance', ()
   it('safely escapes characters to prevent breaking screen reader <desc> or aria-label markup', () => {
     const maliciousLabel = 'Label with <script> & "quotes"';
     const escaped = escapeXML(maliciousLabel);
-    
+
     expect(escaped).not.toContain('<');
     expect(escaped).not.toContain('>');
     expect(escaped).toContain('&lt;script&gt;');
