@@ -6,8 +6,6 @@ import { getClientIp } from '@/utils/getClientIp';
 import { DistributedCache } from '@/lib/cache';
 
 import { getRateLimitHeaders, notifyRateLimiter } from '@/lib/rate-limit';
-
-import { notifyRateLimiter } from '@/lib/rate-limit';
 import { validateCSRF } from '@/lib/security/csrf';
 
 

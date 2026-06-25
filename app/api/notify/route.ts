@@ -267,20 +267,12 @@ export async function DELETE(req: NextRequest) {
 
   const rateLimitKey =
     ip && ip !== 'unknown' ? ip : `unknown:${req.headers.get('user-agent') ?? 'no-agent'}`;
-  const rateLimitResult = await notifyRateLimiter.checkWithResult(rateLimitKey);
-
 
   const deleteRateLimitResult = await notifyRateLimiter.checkWithResult(rateLimitKey);
   if (!deleteRateLimitResult.success) {
     return NextResponse.json(
       { success: false, message: 'Too many requests, please try again later.' },
       { status: 429, headers: getRateLimitHeaders(deleteRateLimitResult) }
-
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { success: false, message: 'Too many requests, please try again later.' },
-      { status: 429, headers: getRateLimitHeaders(rateLimitResult) }
-
     );
   }
 
