@@ -108,7 +108,7 @@ export async function GET(request: Request) {
 
   let shouldBypassCache = isRefreshRequested;
   if (isRefreshRequested) {
-    if (!refreshPolicy.isRefreshAllowed(user)) {
+    if (!refreshPolicy.tryAcquire(user)) {
       logSecurityEvent('STATS_REFRESH_COOLDOWN_VIOLATION', {
         user,
         ip,
@@ -128,9 +128,6 @@ export async function GET(request: Request) {
       bypassCache: shouldBypassCache,
       token: userToken,
     });
-    if (shouldBypassCache) {
-      refreshPolicy.recordRefresh(user);
-    }
 
     const calendar = userData.calendar;
     const stats = calculateStreak(calendar, timezone);

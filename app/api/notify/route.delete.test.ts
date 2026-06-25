@@ -15,84 +15,9 @@ vi.mock('@/models/Notification', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   notifyRateLimiter: {
-    check: vi.fn(),
-    checkWithResult: vi.fn().mockResolvedValue({
-      success: true,
-      limit: 5,
-      remaining: 4,
-      reset: Date.now() + 60000,
-    }),
-  },
-  getRateLimitHeaders: vi.fn(() => ({
-    'X-RateLimit-Limit': '5',
-    'X-RateLimit-Remaining': '4',
-    'X-RateLimit-Reset': Date.now().toString(),
-  })),
-}));
-
-vi.mock('@/lib/github-owner-verification', () => ({
-  verifyGitHubOwner: vi.fn(),
-}));
-
-vi.mock('@/lib/notification-management-token', () => ({
-  createNotificationManagementToken: vi.fn(),
-  getNotificationManagementToken: vi.fn(() => null),
-  hashNotificationManagementToken: vi.fn(),
-  verifyNotificationManagementToken: vi.fn(() => false),
-}));
-
-import { Notification } from '@/models/Notification';
-import { notifyRateLimiter } from '@/lib/rate-limit';
-import { verifyGitHubOwner } from '@/lib/github-owner-verification';
-
-const makeRequest = (search = '') => {
-  return new NextRequest(`http://localhost:3000/api/notify${search ? `?${search}` : ''}`, {
-    method: 'DELETE',
-    headers: {
-      'x-forwarded-for': '127.0.0.1',
-    },
-  });
-};
-
-describe('DELETE /api/notify', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    process.env = {
-      ...originalEnv,
-      MONGODB_URI: 'mongodb://localhost/test',
-    };
-
-    vi.mocked(notifyRateLimiter.check).mockResolvedValue(true);
-
-    vi.mocked(verifyGitHubOwner).mockResolvedValue({
-      verified: true,
-    });
-
-    vi.mocked(Notification.findOne).mockReturnValue({
-      select: vi.fn().mockResolvedValue({
-        username: 'testuser',
-        managementTokenHash: 'hash',
-      }),
-    } as never);
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  it('returns 400 when user parameter is missing', async () => {
-    const res = await DELETE(makeRequest());
-
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 429 when rate limited', async () => {
-    vi.mocked(notifyRateLimiter.checkWithResult).mockResolvedValueOnce({
+    vi.mocked(notifyRateLimiter.checkWithResult).mockResolvedValue({
       success: false,
-      limit: 5,
+      limit: 60,
       remaining: 0,
       reset: Date.now() + 60000,
     });

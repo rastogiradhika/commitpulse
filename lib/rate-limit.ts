@@ -213,6 +213,59 @@ export class RateLimiter {
           remaining: Math.max(0, this.limit - count),
           reset: resetMs,
         };
+      try {
+        const res = await fetch(`${url}/pipeline`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify([
+            ['INCR', `ratelimit_class:${ip}`],
+            ['EXPIRE', `ratelimit_class:${ip}`, Math.floor(this.windowMs / 1000), 'NX'],
+            ['TTL', `ratelimit_class:${ip}`],
+          ]),
+        });
+
+        if (res.ok) {
+          const getData = await res.json();
+          const currentCount = parseInt(getData[0].result ?? '0', 10);
+          const ttl = getData[1].result as number;
+
+          if (currentCount >= this.limit) {
+            return {
+              success: false,
+              limit: this.limit,
+              remaining: 0,
+              reset: ttl > 0 ? now + ttl * 1000 : now + this.windowMs,
+            };
+          }
+
+          const incrRes = await fetch(`${url}/pipeline`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify([
+              ['INCR', `ratelimit_class:${ip}`],
+              ['EXPIRE', `ratelimit_class:${ip}`, Math.floor(this.windowMs / 1000), 'NX'],
+            ]),
+          });
+
+          if (incrRes.ok) {
+            const incrData = await incrRes.json();
+            const count = incrData[0].result as number;
+            return {
+              success: count <= this.limit,
+              limit: this.limit,
+              remaining: Math.max(0, this.limit - count),
+              reset: now + this.windowMs,
+            };
+          }
+        }
+      } catch (error) {
+        console.error('RateLimiter KV error, falling back to memory:', error);
       }
 
       console.error('RateLimiter KV error, falling back to memory');
@@ -302,6 +355,30 @@ export class RateLimiter {
     const cached = ((await this.cache.get(`ratelimit:${ip}`)) as unknown as number) ?? 0;
 
     return Math.max(0, this.limit - cached);
+      try {
+        const res = await fetch(`${url}/get/ratelimit_class:${ip}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          const count = Number(data.result ?? 0);
+
+          return Math.max(0, this.limit - count);
+        }
+      } catch (error) {
+        console.error('RateLimiter KV remaining error:', error);
+      }
+    }
+
+    const cached = await this.cache.get(`ratelimit:${ip}`);
+
+    const count = typeof cached === 'number' ? cached : (cached?.count ?? 0);
+
+    return Math.max(0, this.limit - count);
   }
 
   allow(ip: string): void {
@@ -387,6 +464,31 @@ export async function rateLimit(
         remaining: Math.max(0, limit - count),
         reset: resetMs,
       };
+    try {
+      const res = await fetch(`${url}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([
+          ['INCR', cacheKey],
+          ['EXPIRE', cacheKey, Math.floor(windowMs / 1000), 'NX'],
+        ]),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const count = data[0].result as number;
+        return {
+          success: count <= limit,
+          limit,
+          remaining: Math.max(0, limit - count),
+          reset: now + windowMs, // Approximated for simplicity
+        };
+      }
+    } catch (error) {
+      console.error('Rate limit KV error, falling back to memory:', error);
     }
 
     console.error('Rate limit KV error, falling back to memory');
@@ -394,6 +496,9 @@ export async function rateLimit(
 
   const count = await trackers.incr(cacheKey, windowMs);
 
+  // Atomic increment to avoid TOCTOU race condition where concurrent requests
+  // all read count=0 and all proceed past the limit check.
+  const count = await trackers.incr(cacheKey, windowMs);
   const resetAt = now + windowMs;
 
   return {
