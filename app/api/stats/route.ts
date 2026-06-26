@@ -1,11 +1,12 @@
 // app/api/stats/route.ts
 import { NextResponse } from 'next/server';
-import { fetchGitHubContributions } from '@/lib/github';
+import { fetchGitHubContributions, contributionsCache, cacheKey } from '@/lib/github';
 import { calculateStreak } from '@/lib/calculate';
-import { statsParamsSchema } from '@/lib/validations';
+import { statsParamsSchema, coerceQueryParams } from '@/lib/validations';
 import { getClientIp } from '@/utils/getClientIp';
 import { quotaMonitor } from '@/services/github/quota-monitor';
 import { refreshPolicy } from '@/services/github/refresh-policy';
+import { getRateLimitHeaders } from '@/lib/rate-limit';
 import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
 import { getUserGitHubToken } from '@/lib/githubtoken';
 
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ip = getClientIp(request);
 
-  const parseResult = statsParamsSchema.safeParse(Object.fromEntries(searchParams.entries()));
+  const parseResult = statsParamsSchema.safeParse(coerceQueryParams(searchParams));
 
   if (!parseResult.success) {
     const details = parseResult.error.flatten();
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       { error: 'GitHub API quota is low. Stats refresh temporarily disabled.' },
-      { status: 429 }
+      { status: 429, headers: { 'Retry-After': '60' } }
     );
   }
 
@@ -99,11 +100,7 @@ export async function GET(request: Request) {
         { error: 'Refresh rate limit exceeded. Please try again later.' },
         {
           status: 429,
-          headers: {
-            'X-RateLimit-Limit': rateLimitCheck.limit.toString(),
-            'X-RateLimit-Remaining': rateLimitCheck.remaining.toString(),
-            'X-RateLimit-Reset': rateLimitCheck.reset.toString(),
-          },
+          headers: getRateLimitHeaders(rateLimitCheck),
         }
       );
     }
@@ -111,7 +108,7 @@ export async function GET(request: Request) {
 
   let shouldBypassCache = isRefreshRequested;
   if (isRefreshRequested) {
-    if (!refreshPolicy.isRefreshAllowed(user)) {
+    if (!refreshPolicy.tryAcquire(user)) {
       logSecurityEvent('STATS_REFRESH_COOLDOWN_VIOLATION', {
         user,
         ip,
@@ -122,15 +119,15 @@ export async function GET(request: Request) {
   }
 
   try {
+    const key = cacheKey('contributions', user);
+    const wasCachedBefore = await contributionsCache.has(key);
+
     // Authenticated -> user's OAuth token (their quota); anonymous -> undefined (global PAT).
     const userToken = await getUserGitHubToken();
     const userData = await fetchGitHubContributions(user, {
       bypassCache: shouldBypassCache,
       token: userToken,
     });
-    if (shouldBypassCache) {
-      refreshPolicy.recordRefresh(user);
-    }
 
     const calendar = userData.calendar;
     const stats = calculateStreak(calendar, timezone);
@@ -144,7 +141,7 @@ export async function GET(request: Request) {
       headers.set('Pragma', 'no-cache');
       headers.set('Expires', '0');
     }
-    headers.set('X-Cache-Status', shouldBypassCache ? 'MISS' : 'HIT');
+    headers.set('X-Cache-Status', shouldBypassCache ? 'MISS' : wasCachedBefore ? 'HIT' : 'MISS');
     headers.set(
       'X-Refresh-Status',
       shouldBypassCache ? 'Fresh' : isRefreshRequested ? 'Cooldown-Served-Cached' : 'Cached'
@@ -175,7 +172,7 @@ export async function GET(request: Request) {
     ) {
       return NextResponse.json(
         { error: 'GitHub API rate limit reached. Please try again later.' },
-        { status: 429 }
+        { status: 429, headers: { 'Retry-After': '60' } }
       );
     }
 

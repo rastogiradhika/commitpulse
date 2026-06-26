@@ -1,5 +1,6 @@
 import React from 'react';
-import { truncateUsername } from '../generator';
+import { truncateUsername, getUsernameFontSize } from '../generator';
+import DOMPurify from 'dompurify';
 
 export interface VersusPanelProps {
   user1: string;
@@ -21,6 +22,14 @@ export interface VersusPanelProps {
   statsFont: string;
   bg: string;
   autoTheme?: boolean;
+}
+
+/**
+ * SVG fragments are generated internally by the badge renderer.
+ * User-controlled text is sanitized before fragment generation.
+ */
+function createSafeSvgMarkup(svg: string) {
+  return { __html: DOMPurify.sanitize(svg) };
 }
 
 export const VersusPanel: React.FC<VersusPanelProps> = ({
@@ -56,11 +65,22 @@ export const VersusPanel: React.FC<VersusPanelProps> = ({
       <g transform="translate(0, 0)">
         <g
           transform={`translate(0, ${Math.round(20 * sf)})`}
-          dangerouslySetInnerHTML={{ __html: towers1 }}
+          dangerouslySetInnerHTML={createSafeSvgMarkup(towers1)}
         />
-        <g dangerouslySetInnerHTML={{ __html: labels1 }} />
-        <g dangerouslySetInnerHTML={{ __html: stats1Html }} />
-        <text x={s(300)} y={s(50)} textAnchor="middle" className="title">
+        <g dangerouslySetInnerHTML={createSafeSvgMarkup(labels1)} />
+        <g dangerouslySetInnerHTML={createSafeSvgMarkup(stats1Html)} />
+        <text
+          x={s(300)}
+          y={s(50)}
+          textAnchor="middle"
+          className="title"
+          fontSize={
+            Math.round(getUsernameFontSize(truncateUsername(user1 || 'User 1')) * sf * 10) / 10
+          }
+          style={{
+            fontSize: `${Math.round(getUsernameFontSize(truncateUsername(user1 || 'User 1')) * sf * 10) / 10}px`,
+          }}
+        >
           {title1}
         </text>
       </g>
@@ -68,11 +88,22 @@ export const VersusPanel: React.FC<VersusPanelProps> = ({
       <g transform={`translate(${singleW}, 0)`}>
         <g
           transform={`translate(0, ${Math.round(20 * sf)})`}
-          dangerouslySetInnerHTML={{ __html: towers2 }}
+          dangerouslySetInnerHTML={createSafeSvgMarkup(towers2)}
         />
-        <g dangerouslySetInnerHTML={{ __html: labels2 }} />
-        <g dangerouslySetInnerHTML={{ __html: stats2Html }} />
-        <text x={s(300)} y={s(50)} textAnchor="middle" className="title">
+        <g dangerouslySetInnerHTML={createSafeSvgMarkup(labels2)} />
+        <g dangerouslySetInnerHTML={createSafeSvgMarkup(stats2Html)} />
+        <text
+          x={s(300)}
+          y={s(50)}
+          textAnchor="middle"
+          className="title"
+          fontSize={
+            Math.round(getUsernameFontSize(truncateUsername(user2 || 'User 2')) * sf * 10) / 10
+          }
+          style={{
+            fontSize: `${Math.round(getUsernameFontSize(truncateUsername(user2 || 'User 2')) * sf * 10) / 10}px`,
+          }}
+        >
           {title2}
         </text>
       </g>
