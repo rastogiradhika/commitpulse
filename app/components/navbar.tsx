@@ -328,7 +328,7 @@ export default function Navbar() {
                     href={link.href}
                     target={link.isExternal ? '_blank' : undefined}
                     rel={link.isExternal ? 'noopener noreferrer' : undefined}
-                    className={`relative inline-flex items-center gap-1.5 py-2 font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0a0a0a] whitespace-nowrap shrink-0 ${
+                    className={`relative group inline-flex items-center gap-1.5 py-2 font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0a0a0a] whitespace-nowrap shrink-0 ${
                       link.isPrimary
                         ? `rounded-xl bg-gray-900 text-white shadow-md hover:bg-gray-800 hover:-translate-y-0.5 hover:shadow-lg dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200 dark:hover:shadow-[0_4px_20px_rgba(255,255,255,0.2)] focus-visible:ring-gray-950 dark:focus-visible:ring-white ml-2 ${
                             isLong ? 'px-3 text-xs' : 'px-4 text-sm'
@@ -348,11 +348,11 @@ export default function Navbar() {
                     ) : (
                       <span>{translatedLabel}</span>
                     )}
-                    {isActive && !link.isPrimary && (
+                    {!link.isPrimary && (
                       <span
-                        className={`absolute bottom-0 h-0.5 bg-gray-900 dark:bg-white rounded-full animate-in fade-in slide-in-from-bottom-1 duration-250 ${
+                        className={`absolute bottom-0 h-0.5 bg-gray-900 dark:bg-white rounded-full transform origin-left transition-transform duration-300 ${
                           isLong ? 'left-2 right-2' : 'left-3 right-3'
-                        }`}
+                        } ${isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}
                       />
                     )}
                   </LinkComponent>
@@ -365,7 +365,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="group inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-gray-400 dark:focus-visible:ring-offset-[#0a0a0a]"
+                className="group inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-gray-400 dark:focus-visible:ring-offset-[#0a0a0a] cursor-pointer"
                 aria-label={t('navbar.theme_toggle')}
                 suppressHydrationWarning
               >
@@ -392,7 +392,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="group hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+                className="group hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white cursor-pointer"
                 aria-label={t('navbar.theme_toggle')}
               >
                 {mounted ? (
@@ -413,7 +413,7 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
-                className="md:hidden inline-flex items-center justify-center rounded-xl p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+                className="md:hidden inline-flex items-center justify-center rounded-xl p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white cursor-pointer"
                 aria-label={open ? t('navbar.menu_close') : t('navbar.menu_open')}
                 aria-expanded={open}
                 onClick={() => {
@@ -483,7 +483,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={toggleTheme}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-gray-500"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-gray-500 cursor-pointer"
                     aria-label={t('navbar.theme_toggle')}
                   >
                     {mounted ? (

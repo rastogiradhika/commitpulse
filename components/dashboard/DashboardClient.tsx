@@ -576,7 +576,7 @@ export default function DashboardClient({
           {isCompareMode && secondUserData && (
             <button
               onClick={handleExitCompare}
-              className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-semibold transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black cursor-pointer"
             >
               Exit Compare Mode
             </button>
@@ -614,14 +614,14 @@ export default function DashboardClient({
               </button>
               <Link
                 href={`/achievements?username=${username}`}
-                className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-[#111] hover:bg-zinc-800 dark:hover:bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 active:scale-[0.98]"
+                className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-[#111] hover:bg-zinc-800 dark:hover:bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 active:scale-[0.98] cursor-pointer"
               >
                 🏆 Achievements
               </Link>
               <button
                 ref={triggerRef}
                 onClick={handleOpenModal}
-                className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-[#111] hover:bg-zinc-800 dark:hover:bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-[#111] hover:bg-zinc-800 dark:hover:bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black cursor-pointer"
               >
                 Compare Profile
               </button>
@@ -630,7 +630,7 @@ export default function DashboardClient({
           {isCompareMode && secondUserData && (
             <button
               onClick={handleShareComparison}
-              className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.98]"
+              className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.98] cursor-pointer"
             >
               <Share2 size={16} />
               Share Comparison
@@ -640,14 +640,14 @@ export default function DashboardClient({
           <RefreshButton username={username} />
           <button
             onClick={handleShareDashboard}
-            className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-zinc-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            className="flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-zinc-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black cursor-pointer"
           >
             <Share2 size={16} />
             Share
           </button>
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-black px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 hover:bg-gray-200 dark:hover:bg-white/10 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-xl border border-black/10 dark:border-[rgba(255,255,255,0.15)] bg-black dark:bg-black px-4 py-2 text-sm font-semibold text-white dark:text-white transition-all duration-200 hover:bg-gray-200 dark:hover:bg-white/10 active:scale-[0.98] cursor-pointer"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -671,19 +671,19 @@ export default function DashboardClient({
         <div className="bg-white/50 dark:bg-zinc-900/50 p-1.5 rounded-2xl flex gap-2 w-fit border border-black/10 dark:border-white/10 shadow-sm backdrop-blur-sm">
           <button
             onClick={() => setActiveTab('ci-analytics')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'ci-analytics' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${activeTab === 'ci-analytics' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
           >
             CI Analytics
           </button>
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black ${activeTab === 'overview' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black ${activeTab === 'overview' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
           >
             Overview
           </button>
           <button
             onClick={() => setActiveTab('pr-insights')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black ${activeTab === 'pr-insights' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black ${activeTab === 'pr-insights' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
           >
             PR Insights
           </button>
