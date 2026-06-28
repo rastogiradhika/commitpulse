@@ -90,13 +90,47 @@ describe('scripts/benchmark-svg', () => {
     const lines = logSpy.mock.calls
       .map((args) => String(args[0]))
       .filter(
-        (line) => line.startsWith('Average:') || line.startsWith('Min:') || line.startsWith('Max:')
+        (line) =>
+          line.startsWith('Average:') ||
+          line.startsWith('P50:') ||
+          line.startsWith('P95:') ||
+          line.startsWith('P99:') ||
+          line.startsWith('Min:') ||
+          line.startsWith('Max:')
       );
 
-    expect(lines.length).toBe(9);
+    expect(lines.length).toBe(18);
     for (const line of lines) {
       expect(line).toMatch(/:\s\d+\.\d{2}ms$/);
     }
+  });
+
+  it('correctly calculates and logs percentiles (P50/P95/P99)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { performance } = await import('perf_hooks');
+
+    let callIndex = 0;
+    const differences = Array.from({ length: 20 }, (_, i) => i + 1);
+
+    vi.mocked(performance.now).mockImplementation(() => {
+      const themeCallIndex = callIndex % 40;
+      callIndex += 1;
+
+      const iterIndex = Math.floor(themeCallIndex / 2);
+      const isEnd = themeCallIndex % 2 === 1;
+
+      if (!isEnd) {
+        return iterIndex * 100;
+      } else {
+        return iterIndex * 100 + differences[iterIndex];
+      }
+    });
+
+    await runBenchmarkScript();
+
+    expect(logSpy).toHaveBeenCalledWith('P50: 10.50ms');
+    expect(logSpy).toHaveBeenCalledWith('P95: 19.05ms');
+    expect(logSpy).toHaveBeenCalledWith('P99: 19.81ms');
   });
 
   it('prints separator line after each theme block', async () => {
