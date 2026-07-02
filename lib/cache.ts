@@ -1,5 +1,7 @@
+import 'server-only';
 import { randomUUID } from 'crypto';
 import { brotliCompressSync, brotliDecompressSync } from 'zlib';
+import logger from '@/lib/logger';
 
 /**
  * Configuration options for the distributed mutex lock used by {@link DistributedCache.getOrSet}.
@@ -323,10 +325,12 @@ export class DistributedCache<T> {
     this.localCache = new TTLCache<T>(maxSize, cleanupIntervalMs);
     const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-    this.useRedis = Boolean(url && token);
-    if (this.useRedis) {
-      this.redisUrl = url!.replace(/\/$/, ''); // Remove trailing slash
-      this.redisToken = token!;
+    if (url && token) {
+      this.useRedis = true;
+      this.redisUrl = url.replace(/\/$/, ''); // Remove trailing slash
+      this.redisToken = token;
+    } else {
+      this.useRedis = false;
     }
   }
 
@@ -365,7 +369,11 @@ export class DistributedCache<T> {
       this.localCache.set(key, parsed, localTtlMs);
       return parsed;
     } catch (err) {
-      console.error(`[DistributedCache] GET failed for key "${key}":`, err);
+      logger.error('Cache GET failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       return this.localCache.get(key);
     }
   }
@@ -393,7 +401,11 @@ export class DistributedCache<T> {
         throw new Error(`Redis HTTP error: ${res.status}`);
       }
     } catch (err) {
-      console.error(`[DistributedCache] SET failed for key "${key}":`, err);
+      logger.error('Cache SET failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
     }
   }
 
@@ -420,7 +432,11 @@ export class DistributedCache<T> {
       const data = await res.json();
       return Boolean(data.result);
     } catch (err) {
-      console.error(`[DistributedCache] DELETE failed for key "${key}":`, err);
+      logger.error('Cache DELETE failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       return localDeleted;
     }
   }
@@ -471,7 +487,11 @@ export class DistributedCache<T> {
 
       return updated;
     } catch (err) {
-      console.error(`[DistributedCache] UPDATE failed for key "${key}":`, err);
+      logger.error('Cache UPDATE failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       return false;
     }
   }
@@ -492,6 +512,23 @@ export class DistributedCache<T> {
    */
   async incr(key: string, ttlMs: number): Promise<number> {
     if (!this.useRedis) {
+      // No Redis configured — fall back to the per-instance in-memory counter.
+      //
+      // In serverless environments each cold-start resets the counter, so this
+      // does NOT provide hard cross-instance guarantees. However it is far better
+      // than the previous "fail-closed" behaviour (returning MAX_SAFE_INTEGER),
+      // which blocked every request in production when Redis was not set up.
+      //
+      // Add KV_REST_API_URL + KV_REST_API_TOKEN (Vercel KV) or
+      // UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (Upstash) to your
+      // environment variables to enable proper distributed rate limiting.
+      if (process.env.NODE_ENV === 'production') {
+        logger.warn(
+          'Redis not configured — rate limiting is per-instance only. ' +
+            'Add KV_REST_API_URL + KV_REST_API_TOKEN for distributed rate limiting.',
+          { component: 'DistributedCache', key }
+        );
+      }
       const current = (this.localCache.get(key) as unknown as number) || 0;
       const next = current + 1;
       if (current === 0) {
@@ -529,15 +566,22 @@ return c`;
       this.localCache.set(key, count as unknown as T, ttlMs);
       return count;
     } catch (err) {
-      console.error(`[DistributedCache] INCR failed for key "${key}":`, err);
-      const current = (this.localCache.get(key) as unknown as number) || 0;
-      const next = current + 1;
-      if (current === 0) {
-        this.localCache.set(key, next as unknown as T, ttlMs);
-      } else {
-        this.localCache.update(key, next as unknown as T);
-      }
-      return next;
+      logger.error(
+        'Cache INCR failed — failing closed to avoid bypassing distributed rate limits',
+        {
+          component: 'DistributedCache',
+          key,
+          error: err,
+        }
+      );
+      // Do NOT fall back to a per-instance local counter here. Serverless
+      // instances don't share memory, so a local fallback would let each
+      // instance maintain its own disconnected counter — silently multiplying
+      // the effective rate limit by the number of active instances during
+      // any Redis blip. Failing closed (returning a large value that exceeds
+      // any realistic limit) ensures callers treat this as "limit exceeded"
+      // rather than "limit reset," which is the safer default during an outage.
+      return Number.MAX_SAFE_INTEGER;
     }
   }
 
@@ -661,7 +705,12 @@ return c`;
             throw new Error(`Redis lock HTTP error: ${lockRes.status}`);
           }
         } catch (err) {
-          console.error('[DistributedCache] Lock error for key "%s":', key, err);
+          // Redis network error during locking. Fallback to direct execution.
+          logger.error('Cache lock failed', {
+            component: 'DistributedCache',
+            key,
+            error: err,
+          });
           const fallbackData = await loadFn(cached);
           await this.set(key, fallbackData, ttlMs);
           return fallbackData;
@@ -742,11 +791,30 @@ return c`;
       return finalFallback;
     };
 
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
     const promise = executeAndLock().finally(() => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       this.localLocks.delete(key);
     });
 
     this.localLocks.set(key, promise);
+
+    // Safety Eviction: Forcefully evict locks that hang longer than 60s
+    // to prevent memory leaks (fixes Issue #6177).
+    timeoutTimer = setTimeout(() => {
+      if (this.localLocks.get(key) === promise) {
+        this.localLocks.delete(key);
+        logger.error('Safety eviction triggered for hanging lock', {
+          component: 'DistributedCache',
+          key,
+        });
+      }
+    }, 60000);
+
+    if (timeoutTimer && typeof timeoutTimer.unref === 'function') {
+      timeoutTimer.unref();
+    }
 
     return promise;
   }

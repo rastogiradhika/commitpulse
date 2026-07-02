@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Play, Pause, RotateCcw, Download } from 'lucide-react';
 import type { ActivityData } from '@/types/dashboard';
+import EmptyState from './EmptyState';
 
 // ─── Theme palette (mirrors lib/svg/themes.ts accent colours) ────────────────
 const THEME_PALETTES: Record<string, { accent: string; bg: string; top: string; side: string }> = {
@@ -53,6 +55,7 @@ export interface ContributionCity3DProps {
   theme?: string;
   /** Show the last N days of data (default: 98 = 14 weeks) */
   days?: number;
+  timeLapseMode?: boolean;
 }
 
 interface TooltipState {
@@ -66,13 +69,32 @@ export default function ContributionCity3D({
   data,
   theme = 'dark',
   days = 98,
+  timeLapseMode = false,
 }: ContributionCity3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const hoverDataRef = useRef<
+    Array<{
+      x: number;
+      y: number;
+      count: number;
+      date: string;
+      radius: number;
+    }>
+  >([]);
+
   // Camera state – angles in radians
   const [isDragging, setIsDragging] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  // Time-Lapse state
+  const [isPlaying, setIsPlaying] = useState(timeLapseMode);
+  const [playbackIndex, setPlaybackIndex] = useState(timeLapseMode ? 7 : days);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const cameraRef = useRef({
     rotY: 0.45, // orbit angle (0 = looking from +Z)
@@ -86,20 +108,152 @@ export default function ContributionCity3D({
 
   const palette = THEME_PALETTES[theme] ?? DEFAULT_PALETTE;
 
+  // ── Replay My Year state ───────────────────────────────────────────────────
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState<number | null>(null);
+  const replayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const totalDays = useMemo(() => data.slice(-days).length, [data, days]);
+
+  const stopReplay = useCallback(() => {
+    if (replayTimerRef.current) clearTimeout(replayTimerRef.current);
+    setIsReplaying(false);
+    setReplayIndex(null);
+  }, []);
+
+  const startReplay = useCallback(() => {
+    if (replayTimerRef.current) clearTimeout(replayTimerRef.current);
+    setIsReplaying(true);
+    setReplayIndex(1);
+  }, []);
+
+  // Advance the replay frame-by-frame
+  useEffect(() => {
+    if (!isReplaying || replayIndex === null) return;
+    if (replayIndex >= totalDays) {
+      // Finished – hold full view for a moment then stop
+      replayTimerRef.current = setTimeout(() => stopReplay(), 800);
+      return;
+    }
+    // Speed: faster at the start, steady in the middle — ~12ms per day
+    const delay = replayIndex < 10 ? 30 : 12;
+    replayTimerRef.current = setTimeout(() => {
+      setReplayIndex((prev) => (prev !== null ? prev + 1 : null));
+    }, delay);
+    return () => {
+      if (replayTimerRef.current) clearTimeout(replayTimerRef.current);
+    };
+  }, [isReplaying, replayIndex, totalDays, stopReplay]);
+
+  // Cleanup on unmount
+  useEffect(
+    () => () => {
+      if (replayTimerRef.current) clearTimeout(replayTimerRef.current);
+    },
+    []
+  );
+
+  const handleExport = useCallback(() => {
+    if (!window.MediaRecorder) {
+      alert('Your browser does not support the MediaRecorder API needed for export.');
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      // Cast canvas to any to avoid TS errors if captureStream is missing in types
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stream = (canvas as any).captureStream(60);
+
+      let mimeType = 'video/webm';
+      if (typeof MediaRecorder.isTypeSupported === 'function') {
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+            mimeType = 'video/webm;codecs=vp9';
+          } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+            mimeType = 'video/webm;codecs=vp8';
+          } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+            mimeType = 'video/mp4';
+          } else {
+            mimeType = '';
+          }
+        }
+      }
+
+      const recorderOptions = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, recorderOptions);
+
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const finalMimeType = mimeType || 'video/webm';
+        const blob = new Blob(recordedChunksRef.current, { type: finalMimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `contribution-timelapse.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        setIsExporting(false);
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsExporting(true);
+
+      // Reset playback and start
+      setPlaybackIndex(7);
+      setIsPlaying(true);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to start export recording. Make sure your browser supports captureStream.');
+      setIsExporting(false);
+    }
+  }, []);
+
+  // Stop recording when playback reaches the end
+  useEffect(() => {
+    if (isExporting && !isPlaying && playbackIndex >= Math.min(days, data.length)) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    }
+  }, [isPlaying, isExporting, playbackIndex, days, data.length]);
+
   // ── Build cube specs from ActivityData ─────────────────────────────────────
   const cubes = useCallback((): CubeSpec[] => {
     const recent = data.slice(-days);
+    // When replaying, slice to current frame; zero out future cubes for clean build-up
     const max = Math.max(...recent.map((d) => d.count), 1);
 
-    return recent.map((d, i) => ({
-      col: Math.floor(i / 7), // week column
-      row: i % 7, // day-of-week row
-      height: d.count === 0 ? 0.04 : 0.1 + 0.9 * (d.count / max),
-      count: d.count,
+    const visibleData = timeLapseMode ? recent.slice(0, playbackIndex) : recent;
+    const visibleCount = replayIndex !== null ? replayIndex : visibleData.length;
+
+    return visibleData.map((d, i) => ({
+      col: Math.floor(i / 7),
+      row: i % 7,
+      height: i >= visibleCount ? 0.04 : d.count === 0 ? 0.04 : 0.1 + 0.9 * (d.count / max),
+      count: i >= visibleCount ? 0 : d.count,
       date: d.date,
-      intensity: d.intensity,
+      intensity: i >= visibleCount ? 0 : d.intensity,
     }));
-  }, [data, days]);
+  }, [data, days, timeLapseMode, playbackIndex, replayIndex]);
 
   // ── Draw ───────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -163,6 +317,7 @@ export default function ContributionCity3D({
       const db = b.col * sinY + b.row * cosY;
       return da - db;
     });
+    hoverDataRef.current = [];
 
     for (const cube of sorted) {
       const { col, row, height } = cube;
@@ -183,6 +338,16 @@ export default function ContributionCity3D({
       const t1 = project(wx + 1, cubeHWorld, wz);
       const t2 = project(wx + 1, cubeHWorld, wz + 1);
       const t3 = project(wx, cubeHWorld, wz + 1);
+      const centerX = (t0.cx + t1.cx + t2.cx + t3.cx) / 4;
+      const centerY = (t0.cy + t1.cy + t2.cy + t3.cy) / 4;
+
+      hoverDataRef.current.push({
+        x: centerX,
+        y: centerY,
+        count: cube.count,
+        date: cube.date,
+        radius: tileW * 0.45,
+      });
 
       // Intensity-based tint
       const intFactor = cube.intensity / 4;
@@ -281,6 +446,40 @@ export default function ContributionCity3D({
     draw();
   }, [draw]);
 
+  // ── Time-Lapse Animation Loop ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!timeLapseMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlaybackIndex(days);
+
+      setIsPlaying(false);
+      return;
+    }
+
+    if (!isPlaying) return;
+
+    const maxIndex = Math.min(days, data.length);
+    let frame: number;
+    let lastTime = performance.now();
+
+    const tick = (time: number) => {
+      if (time - lastTime > 60) {
+        setPlaybackIndex((prev) => {
+          if (prev >= maxIndex) {
+            setIsPlaying(false);
+            return maxIndex;
+          }
+          return Math.min(prev + 7, maxIndex);
+        });
+        lastTime = time;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [timeLapseMode, isPlaying, data.length, days]);
+
   // ── Pointer events – orbit drag ────────────────────────────────────────────
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -294,13 +493,49 @@ export default function ContributionCity3D({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const cam = cameraRef.current;
-    const dx = e.clientX - cam.dragStartX;
-    const dy = e.clientY - cam.dragStartY;
-    cam.rotY = cam.startRotY + dx * 0.008;
-    cam.tiltX = Math.max(0.1, Math.min(1.2, cam.startTiltX + dy * 0.005));
-    draw();
+    if (isDragging) {
+      const cam = cameraRef.current;
+      const dx = e.clientX - cam.dragStartX;
+      const dy = e.clientY - cam.dragStartY;
+
+      cam.rotY = cam.startRotY + dx * 0.008;
+      cam.tiltX = Math.max(0.1, Math.min(1.2, cam.startTiltX + dy * 0.005));
+
+      draw();
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const hit = hoverDataRef.current.find((tower) => {
+      const dx = mouseX - tower.x;
+      const dy = mouseY - tower.y;
+
+      return Math.sqrt(dx * dx + dy * dy) <= tower.radius;
+    });
+
+    if (hit) {
+      const padding = 80;
+
+      const safeX = Math.max(padding, Math.min(hit.x, rect.width - padding));
+
+      const safeY = Math.max(40, hit.y);
+
+      setTooltip({
+        x: safeX,
+        y: safeY,
+        count: hit.count,
+        date: hit.date,
+      });
+    } else {
+      setTooltip(null);
+    }
   };
 
   const onPointerUp = () => setIsDragging(false);
@@ -332,6 +567,10 @@ export default function ContributionCity3D({
     lastPinchRef.current = null;
   };
 
+  if (!data || data.length === 0) {
+    return <EmptyState message="No activity found for this timeframe" />;
+  }
+
   return (
     <div className="relative w-full" style={{ background: palette.bg, borderRadius: 12 }}>
       {/* Canvas container */}
@@ -345,6 +584,7 @@ export default function ContributionCity3D({
           className="w-full h-full"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
+          onPointerLeave={() => setTooltip(null)}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onWheel={onWheel}
@@ -353,6 +593,65 @@ export default function ContributionCity3D({
           style={{ display: 'block' }}
         />
       </div>
+
+      {/* Replay My Year button */}
+      <div className="absolute top-3 left-4 flex items-center gap-2">
+        <button
+          onClick={isReplaying ? stopReplay : startReplay}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+          style={{
+            background: isReplaying ? `${palette.accent}22` : `${palette.accent}18`,
+            color: palette.accent,
+            border: `1px solid ${palette.accent}44`,
+          }}
+          title={isReplaying ? 'Stop replay' : 'Replay My Year'}
+        >
+          {isReplaying ? (
+            // Stop icon
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden>
+              <rect x="1" y="1" width="8" height="8" rx="1" />
+            </svg>
+          ) : (
+            // Play icon
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden>
+              <polygon points="2,1 9,5 2,9" />
+            </svg>
+          )}
+          {isReplaying ? 'Stop' : 'Replay My Year'}
+        </button>
+
+        {/* Month label during replay */}
+        {isReplaying &&
+          replayIndex !== null &&
+          (() => {
+            const recent = data.slice(-days);
+            const currentDay = recent[Math.min(replayIndex - 1, recent.length - 1)];
+            const month = currentDay
+              ? new Date(currentDay.date).toLocaleString('default', {
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : '';
+            return (
+              <span className="text-xs font-mono opacity-60" style={{ color: palette.accent }}>
+                {month}
+              </span>
+            );
+          })()}
+      </div>
+
+      {/* Progress bar */}
+      {isReplaying && replayIndex !== null && (
+        <div
+          className="absolute bottom-0 left-0 h-0.5 transition-all"
+          style={{
+            width: `${(replayIndex / totalDays) * 100}%`,
+            background: palette.accent,
+            borderRadius: '0 2px 2px 0',
+            opacity: 0.7,
+          }}
+        />
+      )}
 
       {/* Tooltip */}
       {tooltip && (
@@ -377,12 +676,93 @@ export default function ContributionCity3D({
       )}
 
       {/* Controls hint */}
-      <div
-        className="absolute bottom-3 right-4 text-xs opacity-40 select-none pointer-events-none"
-        style={{ color: palette.accent }}
-      >
-        Drag to rotate · Scroll to zoom
-      </div>
+      {!timeLapseMode && (
+        <div
+          className="absolute bottom-3 right-4 text-xs opacity-40 select-none pointer-events-none"
+          style={{ color: palette.accent }}
+        >
+          Drag to rotate · Scroll to zoom
+        </div>
+      )}
+
+      {/* Time-Lapse UI Overlay */}
+      {timeLapseMode && (
+        <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+          {/* Playback Controls */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md shadow-sm border border-white/10"
+            style={{ background: `${palette.bg}88` }}
+          >
+            <button
+              onClick={() => {
+                if (playbackIndex >= Math.min(days, data.length)) {
+                  setPlaybackIndex(7);
+                }
+                setIsPlaying(!isPlaying);
+              }}
+              disabled={isExporting}
+              className={`p-1.5 rounded-lg transition-colors text-white ${
+                isExporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'
+              }`}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+            </button>
+            <button
+              onClick={() => {
+                setPlaybackIndex(7);
+                setIsPlaying(true);
+              }}
+              disabled={isExporting}
+              className={`p-1.5 rounded-lg transition-colors text-white ${
+                isExporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'
+              }`}
+              aria-label="Restart"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <div className="w-px h-5 bg-white/20 mx-1" />
+            <div
+              className="text-xs font-semibold px-1 min-w-[80px]"
+              style={{ color: palette.accent }}
+            >
+              {playbackIndex > 0 &&
+                (() => {
+                  const recent = data.slice(-days);
+                  const currentData = recent[Math.min(playbackIndex - 1, recent.length - 1)];
+                  if (!currentData) return '...';
+                  const dateObj = new Date(currentData.date);
+                  return dateObj.toLocaleDateString(undefined, {
+                    month: 'short',
+                    year: 'numeric',
+                  });
+                })()}
+            </div>
+            {/* Export button */}
+            <div className="w-px h-5 bg-white/20 mx-1" />
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium text-white ${
+                isExporting ? 'bg-white/20 cursor-wait' : 'hover:bg-white/10'
+              }`}
+              title="Export as WebM video"
+            >
+              {isExporting ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <Download size={14} />
+                  Export
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

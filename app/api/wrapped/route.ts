@@ -4,13 +4,14 @@ import { NextResponse } from 'next/server';
 import { getWrappedData, getCircuitTelemetry } from '@/lib/github';
 import { generateWrappedSVG, generateNotFoundSVG, generateRateLimitSVG } from '@/lib/svg/generator';
 import { escapeXML } from '@/lib/svg/sanitizer';
-import { wrappedParamsSchema } from '@/lib/validations';
+import { wrappedParamsSchema, coerceQueryParams } from '@/lib/validations';
 import type { BadgeParams } from '@/types';
 import { themes } from '@/lib/svg/themes';
 import { getClientIp } from '@/utils/getClientIp';
 import { quotaMonitor } from '@/services/github/quota-monitor';
 import { refreshPolicy } from '@/services/github/refresh-policy';
 import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
+import logger from '@/lib/logger';
 
 const SVG_CSP_HEADER =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://fonts.gstatic.com;";
@@ -20,7 +21,7 @@ const SVG_CSP_HEADER =
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  const parseResult = wrappedParamsSchema.safeParse(Object.fromEntries(searchParams.entries()));
+  const parseResult = wrappedParamsSchema.safeParse(coerceQueryParams(searchParams));
   try {
     if (!parseResult.success) {
       const fieldErrors = parseResult.error.flatten();
@@ -59,7 +60,11 @@ export async function GET(request: Request) {
       tz,
     } = parseResult.data;
 
-    const year = customYear || new Date().getFullYear().toString();
+    const year =
+      customYear ||
+      (tz
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric' }).format(new Date())
+        : new Date().getFullYear().toString());
 
     const themeName = theme || 'dark';
     const isAutoTheme = themeName === 'auto';
@@ -189,6 +194,7 @@ function buildErrorResponse(error: unknown, parseResult: ParseResult): NextRespo
       'Content-Security-Policy': SVG_CSP_HEADER,
     };
 
+    headers['Retry-After'] = '60';
     if (isCircuitOpen) {
       headers['X-CommitPulse-Circuit-Status'] = 'Open';
       headers['X-CommitPulse-Circuit-Reset-In'] = String(telemetry.resetInMs);
@@ -236,7 +242,10 @@ function buildErrorResponse(error: unknown, parseResult: ParseResult): NextRespo
     });
   }
 
-  console.error('[wrapped] Unhandled error:', message);
+  logger.error('Unhandled error', {
+    source: 'wrapped',
+    message,
+  });
 
   const errorSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="400" height="150">

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Sourav Jha', url: 'https://github.com/JhaSourav07' }],
   creator: 'Sourav Jha',
-  manifest: '/manifest.webmanifest',
+  manifest: '/manifest.json',
   icons: {
     apple: '/icons/icon-192x192.png',
   },
@@ -76,7 +76,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0d0d0d',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0d0d0d' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
