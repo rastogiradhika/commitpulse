@@ -20,12 +20,14 @@ describe('DashboardSkeleton - Interactive Tooltips, Cursor Hovers & Touch Event 
     });
   });
 
-  it('verifies that responsive tooltip layouts display at computed coordinates', () => {
-    // Fulfills implementation step 2
+  it('does not render tooltips/overlays in the loading skeleton state on hover', () => {
+    // Skeleton state should suppress any tooltip/overlay UI
     const { container } = render(<DashboardSkeleton />);
 
     // Simulate mouseenter on a segment
-    const firstShimmer = container.querySelector('.shimmer')!;
+    const firstShimmer = container.querySelector('.shimmer');
+    expect(firstShimmer).not.toBeNull();
+    if (!firstShimmer) return;
     fireEvent.mouseEnter(firstShimmer);
 
     // Verify that since it's a skeleton loading state, no responsive tooltips are rendered/displayed
@@ -53,6 +55,8 @@ describe('DashboardSkeleton - Interactive Tooltips, Cursor Hovers & Touch Event 
 
     // Simulate click and touch events on a skeleton segment
     const testElement = shimmerElements[0];
+    expect(testElement).toBeDefined();
+    if (!testElement) return;
     fireEvent.click(testElement);
     fireEvent.touchStart(testElement);
 
@@ -61,11 +65,12 @@ describe('DashboardSkeleton - Interactive Tooltips, Cursor Hovers & Touch Event 
     expect(touchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('asserts appropriate cursor style classes (like pointer) are applied on hover', () => {
+  it('does not apply interactive cursor classes (cursor-pointer/cursor-text) to skeleton shimmer elements', () => {
     // Fulfills implementation step 4
     const { container } = render(<DashboardSkeleton />);
 
     const shimmerElements = container.querySelectorAll('.shimmer');
+    expect(shimmerElements.length).toBeGreaterThan(0);
 
     // Skeletons are decorative, non-interactive visual containers;
     // thus, they must not have any interactive cursor pointers.
@@ -80,7 +85,10 @@ describe('DashboardSkeleton - Interactive Tooltips, Cursor Hovers & Touch Event 
     const { container } = render(<DashboardSkeleton />);
 
     const shimmerElements = container.querySelectorAll('.shimmer');
+    expect(shimmerElements.length).toBeGreaterThan(0);
     const firstShimmer = shimmerElements[0];
+    expect(firstShimmer).toBeDefined();
+    if (!firstShimmer) return;
 
     // Simulate entering then leaving
     fireEvent.mouseEnter(firstShimmer);
