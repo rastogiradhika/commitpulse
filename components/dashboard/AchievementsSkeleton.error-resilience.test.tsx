@@ -11,15 +11,15 @@ let shouldThrow = false;
 const originalMap = Array.prototype.map;
 
 // Override Array.prototype.map to throw conditionally during render
-Array.prototype.map = function (
+Array.prototype.map = function <U>(
   this: unknown[],
-  callback: (value: unknown, index: number, array: unknown[]) => unknown,
+  callback: (value: unknown, index: number, array: unknown[]) => U,
   thisArg?: unknown
-) {
+): U[] {
   if (shouldThrow && this.length === 4 && this[0] === undefined) {
     throw new Error('FATAL_SKELETON_CELL_EXCEPTION: Render blocked by test assertion');
   }
-  return originalMap.call(this, callback, thisArg);
+  return originalMap.call(this, callback, thisArg) as U[];
 };
 
 // Localized Error Boundary for exception safety & fallback tests
