@@ -168,7 +168,7 @@ export function useTranslation() {
           if (process.env.NODE_ENV === 'development') {
             console.warn(`[i18n] Missing translation key "${path}" in English locale.`);
           }
-          
+
           if (params && 'defaultValue' in params) {
             return params.defaultValue;
           }
