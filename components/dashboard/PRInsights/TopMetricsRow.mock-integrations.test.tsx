@@ -10,6 +10,7 @@ import { fetchPRInsights } from '@/services/github/pr-insights';
 import { DistributedCache } from '@/lib/cache';
 
 // Mock framer-motion to bypass animations in tests
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -62,6 +63,15 @@ const mockData: PRInsightData = {
     fastestMerged: { title: 'PR 2', url: 'https://github.com/2', time: 1.2 },
     largest: { title: 'PR 3', url: 'https://github.com/3', additions: 100, deletions: 50 },
   },
+  prs: [
+    {
+      title: 'PR 1',
+      url: 'https://github.com/1',
+      state: 'MERGED',
+      createdAt: '2026-07-04T00:00:00Z',
+      repo: 'repo-1',
+    },
+  ],
 };
 
 describe('TopMetricsRow & PRInsights Service Mock Integrations', () => {
@@ -71,7 +81,8 @@ describe('TopMetricsRow & PRInsights Service Mock Integrations', () => {
     vi.clearAllMocks();
     originalFetch = globalThis.fetch;
     // Set up mock token environments to avoid "GitHub token is missing" errors
-    vi.stubEnv('GITHUB_TOKEN', 'fake-token-123');
+    vi.stubEnv('GITHUB_TOKEN', 'ghp_123456789012345678901234567890123456');
+    vi.stubEnv('GITHUB_PAT', 'ghp_123456789012345678901234567890123456');
   });
 
   afterEach(() => {
