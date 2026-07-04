@@ -9,22 +9,50 @@ import ReviewAnalytics from './ReviewAnalytics';
 import RepoPerformanceTable from './RepoPerformanceTable';
 import Highlights from './Highlights';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from '@/context/TranslationContext';
 
 export default function PRInsightsClient({ username }: { username: string }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<PRInsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
+      const cacheKey = `pr-insights-${username}`;
+      const cached = localStorage.getItem(cacheKey);
+
+      if (cached) {
+        try {
+          setData(JSON.parse(cached));
+          setLoading(false);
+          return; // Skip fetch if cached, or you could do SWR style and still fetch. The requirement says "before triggering database retrievals".
+        } catch (e) {
+          // ignore cache parse error
+        }
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       try {
         setLoading(true);
-        const res = await fetch(`/api/pr-insights?username=${encodeURIComponent(username)}`);
+        const res = await fetch(`/api/pr-insights?username=${encodeURIComponent(username)}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
         if (!res.ok) throw new Error('Failed to fetch PR insights');
         const json = await res.json();
+
+        localStorage.setItem(cacheKey, JSON.stringify(json));
         setData(json);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError('Request timed out');
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
         setLoading(false);
       }
@@ -36,7 +64,7 @@ export default function PRInsightsClient({ username }: { username: string }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500">
         <Loader2 className="w-8 h-8 animate-spin mb-4 text-cyan-500" />
-        <p className="font-medium">Crunching your pull requests...</p>
+        <p className="font-medium">{t('dashboard.prInsights.loader')}</p>
       </div>
     );
   }
@@ -44,7 +72,7 @@ export default function PRInsightsClient({ username }: { username: string }) {
   if (error || !data) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-red-500">
-        <p className="font-medium">Error loading insights: {error}</p>
+        <p className="font-medium">{t('dashboard.prInsights.error', { error: error || '' })}</p>
       </div>
     );
   }
@@ -52,8 +80,8 @@ export default function PRInsightsClient({ username }: { username: string }) {
   if (data.totalPRs === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500 border border-dashed border-gray-300 dark:border-zinc-800 rounded-3xl">
-        <p className="font-medium text-lg">No pull request activity found.</p>
-        <p className="text-sm">Start contributing to see your insights here!</p>
+        <p className="font-medium text-lg">{t('dashboard.prInsights.no_activity')}</p>
+        <p className="text-sm">{t('dashboard.prInsights.start_contributing')}</p>
       </div>
     );
   }
