@@ -728,6 +728,9 @@ function sanitizeErrorMessage(message: string): string {
   if (lower.includes('strictly accepts a maximum of 2')) {
     return 'The streak comparison generator strictly accepts a maximum of 2 usernames.';
   }
+  if (lower.includes('maximum of 7 usernames')) {
+    return 'A maximum of 7 usernames is supported for the skyline.';
+  }
   if (lower.includes('quota is low')) {
     return 'API rate limit quota is low. Please try again later.';
   }
