@@ -14,6 +14,8 @@ describe('EditorPanel Type Compiler Validation', () => {
       githubUsername: string;
       showCommitPulse: boolean;
       commitPulseAccent: string;
+      showRepoSpotlight: boolean;
+      spotlightRepo: string;
       showSnakeGraph: boolean;
       showPacmanGraph: boolean;
       graphPlacement: 'top' | 'middle' | 'bottom';
@@ -71,6 +73,10 @@ describe('EditorPanel Type Compiler Validation', () => {
       | 'onShowSnakeGraphChange'
       | 'onShowPacmanGraphChange'
       | 'onGraphPlacementChange'
+      | 'showRepoSpotlight'
+      | 'spotlightRepo'
+      | 'onShowRepoSpotlightChange'
+      | 'onSpotlightRepoChange'
     >;
     expectTypeOf<OptionalProps>().toEqualTypeOf<{
       showSnakeGraph?: boolean;
@@ -79,6 +85,10 @@ describe('EditorPanel Type Compiler Validation', () => {
       onShowSnakeGraphChange?: (v: boolean) => void;
       onShowPacmanGraphChange?: (v: boolean) => void;
       onGraphPlacementChange?: (v: 'top' | 'middle' | 'bottom') => void;
+      showRepoSpotlight?: boolean;
+      spotlightRepo?: string;
+      onShowRepoSpotlightChange?: (v: boolean) => void;
+      onSpotlightRepoChange?: (v: string) => void;
     }>();
   });
 
