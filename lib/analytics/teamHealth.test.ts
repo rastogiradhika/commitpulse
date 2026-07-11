@@ -8,11 +8,10 @@ import {
 import type { TeamMember } from '@/types/enterprise';
 import type { ContributionCalendar } from '@/types';
 
-// Re-import the non-exported calculateTeamHealthScore indirectly isn't
-// possible since it's private — these tests exercise it via the metrics
-// it depends on, confirming no NaN/Infinity leaks into TeamMetrics itself,
-// and directly test the already-exported functions with the same
-// division-by-zero shape.
+// Because calculateTeamHealthScore is private, these tests exercise it
+// indirectly through the metrics it depends on. That still confirms no
+// NaN/Infinity leaks into TeamMetrics itself and directly tests the
+// already-exported functions with the same division-by-zero shape.
 
 describe('[Bug fix] teamHealth.ts — divide-by-zero guards', () => {
   const emptyMembers: TeamMember[] = [];
