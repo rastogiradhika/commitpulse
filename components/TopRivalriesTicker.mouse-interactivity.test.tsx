@@ -73,7 +73,7 @@ describe('TopRivalriesTicker Mouse Interactivity', () => {
     render(<TopRivalriesTicker />);
 
     const kernelVsReact = screen.getAllByText('Kernel vs React')[0];
-    const platformWars = screen.getAllByText('Platform Wars')[0];
+    const platformWars = screen.getAllByText('Vercel & Netlify Founders')[0];
 
     const firstContainer = kernelVsReact.closest('div.group');
     const secondContainer = platformWars.closest('div.group');
