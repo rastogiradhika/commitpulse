@@ -707,6 +707,7 @@ export const githubParamsSchema = z.object({
 
   refresh: z.preprocess((val) => val === 'true', z.boolean()).default(false),
   bypassCache: z.preprocess((val) => val === 'true', z.boolean()).default(false),
+  excludeBots: z.preprocess((val) => val === 'true', z.boolean()).default(false),
   org: z
     .string()
     .max(39, { message: 'Organization name cannot exceed 39 characters' })
@@ -786,6 +787,7 @@ export const statsParamsSchema = z.object({
     }),
   refresh: z.string().optional().transform(toRefreshFlag),
   bypassCache: z.string().optional().transform(toRefreshFlag),
+  excludeBots: z.string().optional().transform(toRefreshFlag),
   tz: timeZoneParam,
 });
 
