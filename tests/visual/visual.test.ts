@@ -222,7 +222,7 @@ describe('Visual Regression Tests - SVG Generators', () => {
   });
 
   it('5. generateWrappedSVG', () => {
-    const svg = generateWrappedSVG(mockWrappedStats, mockParams, 2024, mockCalendar);
+    const svg = generateWrappedSVG(mockWrappedStats, mockParams, '2024', mockCalendar);
     compareOrUpdateVisualBaseline('generateWrappedSVG', svg);
   });
 
@@ -266,7 +266,7 @@ describe('Visual Regression Tests - SVG Generators', () => {
   });
 
   it('12. generateRateLimitSVG', () => {
-    const svg = generateRateLimitSVG(mockParams);
+    const svg = generateRateLimitSVG('0d1117', '58a6ff', 'c9d1d9', 8, '8s', false);
     compareOrUpdateVisualBaseline('generateRateLimitSVG', svg);
   });
 
